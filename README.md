@@ -1,4 +1,4 @@
-# MathStats - Motor de Desafios (Back-end)
+# MathStats - Motor de Desafios
 
 API desenvolvida em Node.js e TypeScript para a plataforma educacional MathStats. Este serviço consome dados reais de partidas de futebol via API-Football, calcula estatísticas (como média de gols) e gera desafios matemáticos dinâmicos, validando as respostas e persistindo tudo em um banco de dados Firebase Firestore.
 
