@@ -31,7 +31,8 @@ API desenvolvida em Node.js e TypeScript para a plataforma educacional MathStats
 
 ```bash
 git clone https://github.com/guilherme-math/MathStats.git
-cd mathstats-entrega1409
+cd MathStats
+git checkout entrega1409
 npm install
 ```
 
