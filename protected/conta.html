@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Conta e privacidade | MathStats</title>
+    <meta
+      name="description"
+      content="Gerencie sua conta, formas de acesso, privacidade e dados do MathStats."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/auth.css" />
+    <link rel="stylesheet" href="/site-footer.css" />
+  </head>
+  <body data-page="account">
+    <div class="mesh" aria-hidden="true">
+      <div class="mesh-plane"></div>
+      <div class="mesh-axis"></div>
+    </div>
+
+    <header class="auth-topbar">
+      <div class="auth-topbar-inner dashboard-topbar-inner">
+        <a class="brand" href="/dashboard" aria-label="MathStats — painel">
+          <span class="brand-mark">M<span>Σ</span></span>
+          <span class="brand-copy"
+            ><strong>MATH<span>/</span>STATS</strong><small>CONTA E PRIVACIDADE</small></span
+          >
+        </a>
+        <nav class="dashboard-nav" aria-label="Navegação principal">
+          <a href="/dashboard">PAINEL</a>
+          <a href="/desafio">TRILHA</a>
+          <a class="is-active" href="/conta">CONTA</a>
+        </nav>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Ativar modo claro">
+          <svg class="moon-icon" viewBox="0 0 24 24">
+            <path d="M20 15.5A8.4 8.4 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5z"></path>
+          </svg>
+          <svg class="sun-icon" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path
+              d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+            ></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="auth-shell dashboard-shell dashboard-page account-page">
+      <section class="section-heading account-page-heading">
+        <p class="eyebrow">CONTA / PRIVACIDADE / AUDITORIA</p>
+        <h1>Conta e dados</h1>
+        <p>
+          Gerencie suas informações de acesso, seus dados pessoais e os recursos de privacidade do
+          MathStats.
+        </p>
+      </section>
+
+      <div class="account-grid">
+        <section class="account-card">
+          <h3>Perfil autenticado</h3>
+          <div class="profile-line">
+            <span>Nome</span><strong id="profileName">Carregando...</strong>
+          </div>
+          <div class="profile-line">
+            <span>Usuário</span><strong id="profileUser">Carregando...</strong>
+          </div>
+          <div class="profile-line">
+            <span>E-mail</span><strong id="profileEmail">Carregando...</strong>
+          </div>
+          <div class="profile-line">
+            <span>XP total</span><strong id="profileXp">Carregando...</strong>
+          </div>
+          <div class="profile-line">
+            <span>Ofensiva</span><strong id="profileStreak">Carregando...</strong>
+          </div>
+          <div class="profile-line">
+            <span>Google</span><strong id="profileGoogle">Carregando...</strong>
+          </div>
+          <div class="profile-line">
+            <span>Senha</span><strong id="profilePassword">Carregando...</strong>
+          </div>
+          <div class="action-stack mt-3">
+            <button class="secondary-button" id="logoutBtn" type="button">SAIR DA CONTA</button>
+          </div>
+        </section>
+
+        <section class="account-card">
+          <h3>Direitos e dados</h3>
+          <p>Consulte, exporte ou gerencie os dados associados à sua conta.</p>
+          <div class="action-stack">
+            <button class="secondary-button" id="dataBtn" type="button">
+              CONSULTAR MEUS DADOS
+            </button>
+            <button class="secondary-button" id="exportBtn" type="button">
+              EXPORTAR MEUS DADOS
+            </button>
+            <button class="secondary-button" id="logsBtn" type="button">
+              VER LOGS DE AUDITORIA
+            </button>
+            <button class="secondary-button" id="rightsRequestBtn" type="button">
+              PEDIR REVISÃO DE PRIVACIDADE
+            </button>
+            <button class="secondary-button" id="privacyRequestsBtn" type="button">
+              ACOMPANHAR SOLICITAÇÕES
+            </button>
+            <button class="danger-button" id="deleteBtn" type="button">EXCLUIR CONTA</button>
+          </div>
+        </section>
+      </div>
+
+      <section class="account-card mt-3">
+        <h3>Atualizar nome de exibição</h3>
+        <p>
+          Atualize o nome mostrado no MathStats. Linguagem ofensiva não é aceita. Alterações de
+          e-mail ou nome de usuário exigem um fluxo de segurança específico e não são feitas por
+          este formulário.
+        </p>
+        <form id="profileCorrectionForm" class="password-setup-grid">
+          <div class="field">
+            <label for="profileDisplayName">Nome de exibição</label
+            ><input id="profileDisplayName" type="text" maxlength="60" autocomplete="name" />
+          </div>
+          <button class="secondary-button loading-button" id="profileCorrectionBtn" type="submit">
+            ATUALIZAR NOME DE EXIBIÇÃO
+          </button>
+        </form>
+        <p class="feedback" id="profileCorrectionFeedback" role="alert"></p>
+      </section>
+
+      <section class="account-card mt-3" id="passwordSetup" hidden>
+        <h3>Criar senha para esta conta</h3>
+        <p>
+          Se sua conta foi criada com Google, você pode adicionar uma senha e manter as duas formas
+          de acesso na mesma conta.
+        </p>
+        <form id="passwordSetupForm" class="password-setup-grid">
+          <div class="field">
+            <label for="accountNewPassword">Nova senha</label>
+            <div class="input-wrap">
+              <input
+                id="accountNewPassword"
+                type="password"
+                autocomplete="new-password"
+                placeholder="Mínimo 8 caracteres"
+              /><button
+                class="eye-button"
+                id="accountNewPasswordToggle"
+                type="button"
+                aria-label="Mostrar senha"
+              ></button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="accountConfirmPassword">Confirmar senha</label>
+            <div class="input-wrap">
+              <input
+                id="accountConfirmPassword"
+                type="password"
+                autocomplete="new-password"
+                placeholder="Repita a senha"
+              /><button
+                class="eye-button"
+                id="accountConfirmPasswordToggle"
+                type="button"
+                aria-label="Mostrar senha"
+              ></button>
+            </div>
+          </div>
+          <button class="primary-button loading-button" id="accountPasswordBtn" type="submit">
+            CRIAR SENHA
+          </button>
+        </form>
+        <p class="feedback" id="accountPasswordFeedback" role="alert"></p>
+      </section>
+
+      <section class="account-card mt-3" id="dataOutputWrap" hidden>
+        <h3>Dados pessoais</h3>
+        <pre id="dataOutput" class="data-output"></pre>
+      </section>
+      <section class="account-card mt-3" id="logsWrap" hidden>
+        <h3>Histórico de auditoria</h3>
+        <div class="log-list" id="logsContent"></div>
+      </section>
+      <section class="account-card mt-3" id="privacyRequestsWrap" hidden>
+        <h3>Solicitações de privacidade</h3>
+        <div class="log-list" id="privacyRequestsContent"></div>
+      </section>
+      <p class="feedback" id="accountFeedback" role="alert"></p>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <div class="site-footer-brand">
+          <strong>MATH/STATS</strong><span>Aprendizado orientado por dados esportivos.</span>
+        </div>
+        <nav aria-label="Links legais">
+          <a href="/politica-de-privacidade.html">Política de Privacidade</a
+          ><a href="/termos-de-uso.html">Termos de Uso</a>
+        </nav>
+        <span class="site-footer-copy">© 2026 MATH/STATS</span>
+      </div>
+    </footer>
+    <script src="/auth.js"></script>
+  </body>
+</html>

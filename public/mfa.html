@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Verificação 2FA | MathStats</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/auth.css" />
+    <link rel="stylesheet" href="/site-footer.css" />
+  </head>
+  <body data-page="mfa">
+    <div class="mesh" aria-hidden="true">
+      <div class="mesh-plane"></div>
+      <div class="mesh-axis"></div>
+    </div>
+    <header class="auth-topbar">
+      <div class="auth-topbar-inner">
+        <a class="brand" href="/"
+          ><span class="brand-mark">M<span>Σ</span></span
+          ><span class="brand-copy"
+            ><strong>MATH<span>/</span>STATS</strong
+            ><small>MATEMÁTICA E DADOS DE FUTEBOL</small></span
+          ></a
+        ><button class="theme-toggle" id="themeToggle" type="button" aria-label="Ativar modo claro">
+          <svg class="moon-icon" viewBox="0 0 24 24">
+            <path d="M20 15.5A8.4 8.4 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5z"></path></svg
+          ><svg class="sun-icon" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path
+              d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+            ></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+    <main class="auth-shell">
+      <div class="auth-grid">
+        <section class="auth-copy">
+          <p class="eyebrow">SEGURANÇA / ETAPA 02</p>
+          <h1>CONFIRME<br /><span>SEU ACESSO</span></h1>
+          <p>
+            A senha foi validada. Agora escolha uma segunda forma de verificação para concluir o
+            login.
+          </p>
+          <div class="feature-strip">
+            <div><strong>TOTP</strong><small>Código do autenticador</small></div>
+            <div><strong>E-MAIL</strong><small>Código válido por 15 min</small></div>
+            <div><strong>SESSÃO</strong><small>15 minutos de duração</small></div>
+          </div>
+        </section>
+        <section class="auth-card">
+          <div class="auth-card-body">
+            <span class="card-code">2FA / VERIFICAÇÃO</span>
+            <h2>Segunda etapa</h2>
+            <p class="card-intro">Escolha como deseja confirmar sua identidade.</p>
+            <div class="method-tabs">
+              <button class="method-tab" id="btnApp" type="button">APP AUTENTICADOR</button
+              ><button class="method-tab" id="btnEmail" type="button">CÓDIGO POR E-MAIL</button>
+            </div>
+            <div id="panelApp">
+              <form id="mfaAppForm">
+                <div class="field">
+                  <label for="mfaCode">Código de 6 dígitos</label
+                  ><input
+                    class="otp-input"
+                    id="mfaCode"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    maxlength="6"
+                    placeholder="000000"
+                  />
+                </div>
+                <button class="primary-button loading-button" id="mfaAppBtn" type="submit">
+                  VALIDAR CÓDIGO
+                </button>
+              </form>
+            </div>
+            <div id="panelEmail" hidden>
+              <div id="emailStep1">
+                <p class="card-intro">Enviaremos um código temporário para o e-mail cadastrado.</p>
+                <button class="secondary-button loading-button" id="sendEmailCodeBtn" type="button">
+                  ENVIAR CÓDIGO
+                </button>
+              </div>
+              <div id="emailStep2" hidden>
+                <form id="mfaEmailForm">
+                  <div class="field">
+                    <label for="mfaEmailCode">Código recebido</label
+                    ><input
+                      class="otp-input"
+                      id="mfaEmailCode"
+                      type="text"
+                      inputmode="numeric"
+                      autocomplete="one-time-code"
+                      maxlength="6"
+                      placeholder="000000"
+                    />
+                  </div>
+                  <button class="primary-button loading-button" id="mfaEmailBtn" type="submit">
+                    VALIDAR CÓDIGO
+                  </button>
+                </form>
+              </div>
+            </div>
+            <p class="feedback" id="mfaFeedback" role="alert"></p>
+            <div class="auth-links"><a href="/">← VOLTAR AO LOGIN</a></div>
+          </div>
+        </section>
+      </div>
+    </main>
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <div class="site-footer-brand">
+          <strong>MATH/STATS</strong><span>Aprendizado orientado por dados esportivos.</span>
+        </div>
+        <nav aria-label="Links legais">
+          <a href="/politica-de-privacidade.html">Política de Privacidade</a
+          ><a href="/termos-de-uso.html">Termos de Uso</a>
+        </nav>
+        <span class="site-footer-copy">© 2026 MATH/STATS</span>
+      </div>
+    </footer>
+    <script src="/auth.js"></script>
+  </body>
+</html>

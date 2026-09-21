@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Painel | MathStats</title>
+    <meta
+      name="description"
+      content="Acompanhe seu progresso, XP, ofensiva e desempenho no MathStats."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/auth.css" />
+    <link rel="stylesheet" href="/site-footer.css" />
+  </head>
+  <body data-page="dashboard">
+    <div class="mesh" aria-hidden="true">
+      <div class="mesh-plane"></div>
+      <div class="mesh-axis"></div>
+    </div>
+
+    <header class="auth-topbar">
+      <div class="auth-topbar-inner dashboard-topbar-inner">
+        <a class="brand" href="/dashboard" aria-label="MathStats — painel">
+          <span class="brand-mark">M<span>Σ</span></span>
+          <span class="brand-copy"
+            ><strong>MATH<span>/</span>STATS</strong><small>PAINEL DE APRENDIZAGEM</small></span
+          >
+        </a>
+        <nav class="dashboard-nav" aria-label="Navegação principal">
+          <a class="is-active" href="/dashboard">PAINEL</a>
+          <a href="/desafio">TRILHA</a>
+          <a href="/conta">CONTA</a>
+        </nav>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Ativar modo claro">
+          <svg class="moon-icon" viewBox="0 0 24 24">
+            <path d="M20 15.5A8.4 8.4 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5z"></path>
+          </svg>
+          <svg class="sun-icon" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path
+              d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+            ></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="auth-shell dashboard-shell dashboard-page">
+      <section class="dashboard-hero">
+        <div>
+          <p class="eyebrow">HOME / VISÃO GERAL</p>
+          <h1>Olá, <span id="dashboardName">...</span></h1>
+          <p id="dashboardSubtitle">Carregando seu progresso no MathStats...</p>
+        </div>
+        <div class="dashboard-hero-actions">
+          <button class="primary-button" id="openChallengeBtn" type="button">
+            CONTINUAR TRILHA
+          </button>
+          <a class="secondary-button dashboard-link-button" href="/conta">MINHA CONTA</a>
+        </div>
+      </section>
+
+      <section class="metric-grid" aria-label="Resumo do progresso">
+        <article class="metric-card">
+          <span class="metric-code">XP TOTAL</span><strong id="metricXp">0</strong
+          ><small>experiência acumulada</small>
+        </article>
+        <article class="metric-card">
+          <span class="metric-code">OFENSIVA</span><strong id="metricStreak">🔥 0</strong
+          ><small id="metricStreakText">dias consecutivos</small>
+        </article>
+        <article class="metric-card">
+          <span class="metric-code">DESAFIOS</span><strong id="metricChallenges">0</strong
+          ><small id="metricCorrectText">0 acertos</small>
+        </article>
+        <article class="metric-card">
+          <span class="metric-code">APROVEITAMENTO</span><strong id="metricAccuracy">0%</strong
+          ><small>acertos no histórico</small>
+        </article>
+      </section>
+
+      <section class="dashboard-insights" id="desempenho">
+        <article class="dashboard-panel performance-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="metric-code">DESEMPENHO GERAL</span>
+              <h2>Precisão das respostas</h2>
+            </div>
+            <span class="panel-badge" id="performanceBadge">0 desafios</span>
+          </div>
+          <div class="performance-layout">
+            <div class="accuracy-ring" id="accuracyRing" style="--accuracy: 0">
+              <div><strong id="ringAccuracy">0%</strong><span>acertos</span></div>
+            </div>
+            <div class="performance-breakdown">
+              <div><span>Corretas</span><strong id="performanceCorrect">0</strong></div>
+              <div><span>Incorretas</span><strong id="performanceIncorrect">0</strong></div>
+              <div><span>Últimos 7 dias</span><strong id="performanceWeek">0%</strong></div>
+              <div><span>XP na semana</span><strong id="performanceWeekXp">0 XP</strong></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="dashboard-panel activity-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="metric-code">ATIVIDADE</span>
+              <h2>Últimos 7 dias</h2>
+            </div>
+            <span class="panel-badge" id="activityBadge">0 respostas</span>
+          </div>
+          <div
+            class="activity-chart"
+            id="activityChart"
+            aria-label="Desafios respondidos nos últimos sete dias"
+          ></div>
+          <div class="activity-legend">
+            <span><i class="legend-dot"></i> desafios respondidos</span
+            ><strong id="activitySummary">0 XP no período</strong>
+          </div>
+        </article>
+      </section>
+
+      <section class="dashboard-panel mt-3">
+        <div class="panel-heading">
+          <div>
+            <span class="metric-code">ÁREAS DE ESTUDO</span>
+            <h2>Desempenho por categoria</h2>
+          </div>
+          <span class="panel-badge" id="categoryBadge">histórico</span>
+        </div>
+        <div class="category-list" id="categoryPerformance">
+          <div class="dashboard-empty">Carregando categorias...</div>
+        </div>
+      </section>
+
+      <section class="dashboard-panel mt-3">
+        <div class="panel-heading">
+          <div>
+            <span class="metric-code">ATIVIDADE RECENTE</span>
+            <h2>Últimos desafios</h2>
+          </div>
+          <a class="panel-text-link" href="/desafio">RESPONDER MAIS →</a>
+        </div>
+        <div class="recent-challenges" id="challengeHistory">
+          <div class="dashboard-empty">Carregando histórico...</div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <div class="site-footer-brand">
+          <strong>MATH/STATS</strong><span>Aprendizado orientado por dados esportivos.</span>
+        </div>
+        <nav aria-label="Links legais">
+          <a href="/politica-de-privacidade.html">Política de Privacidade</a
+          ><a href="/termos-de-uso.html">Termos de Uso</a>
+        </nav>
+        <span class="site-footer-copy">© 2026 MATH/STATS</span>
+      </div>
+    </footer>
+    <script src="/auth.js"></script>
+  </body>
+</html>
