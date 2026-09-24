@@ -2,13 +2,11 @@ node_modules/
 dist/
 coverage/
 .vercel/
-
 .env
 .env.*
 !.env.example
 firebase-key*.json
 *.pem
-
 *.log
 *.tsbuildinfo
 .DS_Store

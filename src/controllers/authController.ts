@@ -12,6 +12,8 @@ import type { AppSession } from '../types/session';
 import { getEffectiveStreak, getStudyDateKey, previousStudyDateKey } from '../utils/streak';
 import { validatePublicIdentity } from '../utils/contentFilter';
 import { LEGAL_DOCUMENTS } from '../config/legalDocuments';
+import { isTrustedDevice, rememberTrustedDevice } from '../utils/trustedDevice';
+import { isPasswordValid, PASSWORD_POLICY_MESSAGE } from '../utils/passwordPolicy';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
@@ -96,8 +98,8 @@ export const AuthController = {
           'O usuário deve ter de 3 a 24 caracteres e usar apenas letras, números, ponto, hífen ou underline.',
       });
     }
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'A senha deve ter no mínimo 8 caracteres.' });
+    if (!isPasswordValid(password)) {
+      return res.status(400).json({ error: PASSWORD_POLICY_MESSAGE });
     }
     if (!lgpdAccepted) {
       return res.status(400).json({
@@ -210,8 +212,29 @@ export const AuthController = {
         userId: user.id,
         username: user.username,
         ip: getIp(req),
-        detail: 'Autenticação primária validada; aguardando 2FA',
+        detail: 'Senha validada',
       });
+
+      if (isTrustedDevice(req, user.id, user.passwordHash)) {
+        s(req).userId = user.id;
+        s(req).username = user.username;
+        s(req).role = user.role;
+        s(req).pending2faUserId = undefined;
+        s(req).mfaEmailCodeHash = undefined;
+        s(req).mfaEmailExpires = undefined;
+        await audit({
+          event: 'LOGIN_2FA_SUCCESS',
+          userId: user.id,
+          username: user.username,
+          ip: getIp(req),
+          detail: 'Login concluído em dispositivo confiável',
+        });
+        return res.json({
+          message: 'Acesso liberado neste dispositivo confiável.',
+          authenticated: true,
+          rememberedDevice: true,
+        });
+      }
 
       s(req).pending2faUserId = user.id;
       return res.json({
@@ -235,12 +258,9 @@ export const AuthController = {
       if (!user?.email) return res.status(400).json({ error: 'E-mail da conta não encontrado.' });
 
       const code = (crypto.randomBytes(4).readUInt32BE(0) % 1_000_000).toString().padStart(6, '0');
+      await sendMfaCodeEmail(user.email, user.username, code);
       s(req).mfaEmailCodeHash = hashCode(code);
       s(req).mfaEmailExpires = Date.now() + 15 * 60 * 1000;
-
-      void sendMfaCodeEmail(user.email, user.username, code).catch((error) =>
-        console.error('[mailer] Falha ao enviar código MFA:', error),
-      );
 
       return res.json({
         message: 'Código enviado para o e-mail cadastrado. Válido por 15 minutos.',
@@ -254,7 +274,7 @@ export const AuthController = {
   },
 
   async verifyToken(req: Request, res: Response) {
-    const { token, method } = req.body;
+    const { token, method, rememberDevice } = req.body;
     const session = s(req);
     const pendingId = session.pending2faUserId;
 
@@ -322,7 +342,12 @@ export const AuthController = {
 
       session.userId = pendingId;
       session.username = user.username;
+      session.role = user.role;
       session.pending2faUserId = undefined;
+
+      if (rememberDevice === true && user.passwordHash) {
+        rememberTrustedDevice(req, res, user.id, user.passwordHash);
+      }
 
       await audit({
         event: 'LOGIN_2FA_SUCCESS',
@@ -332,7 +357,10 @@ export const AuthController = {
         detail: `Login completo via 2FA (${method === 'email' ? 'e-mail' : 'app'})`,
       });
 
-      return res.json({ message: 'Acesso liberado.' });
+      return res.json({
+        message: 'Acesso liberado.',
+        trustedDevice: rememberDevice === true && Boolean(user.passwordHash),
+      });
     } catch (error) {
       console.error('[verify-token]', error);
       return res.status(500).json({ error: 'Erro ao validar o código. Tente novamente.' });
@@ -396,11 +424,14 @@ export const AuthController = {
           userId: user.id,
           username: user.username,
           ip: getIp(req),
-          detail: 'Autenticação primária via Google; aguardando 2FA',
+          detail: 'Login concluído via conta Google com e-mail verificado',
         });
-        s(req).pending2faUserId = user.id;
+        s(req).userId = user.id;
+        s(req).username = user.username;
+        s(req).role = user.role;
+        s(req).pending2faUserId = undefined;
         return res.json({
-          require2FA: true,
+          authenticated: true,
           linkedExistingAccount: !byGoogleId && Boolean(byEmail),
         });
       }
@@ -453,23 +484,16 @@ export const AuthController = {
         return res.status(409).json({ error: 'Nome de usuário já está em uso.' });
       }
 
-      const mfaSecret = speakeasy.generateSecret({ name: `MathStats (${usernameNormalized})` });
-      const qrCodeImage = await qrcode.toDataURL(mfaSecret.otpauth_url!);
-
       user = await UserModel.create({
         displayName: displayNameValue,
         username: usernameNormalized,
         email: emailNormalized,
         passwordHash: '',
-        twoFactorSecret: encryptAES(mfaSecret.base32),
+        twoFactorSecret: '',
         legalAcceptedAt: new Date(),
         ...LEGAL_DOCUMENTS,
         googleId,
       });
-
-      void sendWelcomeEmail(emailNormalized, user.displayName || user.username, qrCodeImage).catch(
-        (error) => console.error('[mailer] Falha no e-mail de boas-vindas Google:', error),
-      );
 
       await audit({
         event: 'SIGNUP',
@@ -479,10 +503,15 @@ export const AuthController = {
         detail: 'Conta criada via Google com aceite dos documentos legais',
       });
 
+      s(req).userId = user.id;
+      s(req).username = user.username;
+      s(req).role = user.role;
+      s(req).pending2faUserId = undefined;
+
       return res.status(201).json({
         created: true,
-        message: 'Conta criada com Google. Configure o 2FA antes do primeiro acesso.',
-        qrCodeUrl: qrCodeImage,
+        authenticated: true,
+        message: 'Conta criada e autenticada com Google.',
       });
     } catch (error) {
       console.error('[google-auth]', error);
@@ -492,29 +521,37 @@ export const AuthController = {
 
   async setPassword(req: Request, res: Response) {
     const userId = s(req).userId;
-    const { password } = req.body;
+    const { currentPassword, password } = req.body;
 
     if (!userId) return res.status(401).json({ error: 'Acesso negado.' });
-    if (!password || password.length < 8)
-      return res.status(400).json({ error: 'A senha deve ter no mínimo 8 caracteres.' });
+    if (!isPasswordValid(password)) return res.status(400).json({ error: PASSWORD_POLICY_MESSAGE });
 
     try {
       const user = await UserModel.findById(userId);
       if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
-      if (user.passwordHash)
-        return res.status(409).json({ error: 'Esta conta já possui uma senha cadastrada.' });
+
+      const changingPassword = Boolean(user.passwordHash);
+      if (
+        changingPassword &&
+        (!currentPassword || !(await argon2.verify(user.passwordHash, currentPassword)))
+      ) {
+        return res.status(401).json({ error: 'A senha atual está incorreta.' });
+      }
 
       await UserModel.updatePassword(user.id, await hashPassword(password));
       await audit({
-        event: 'PASSWORD_CREATED',
+        event: changingPassword ? 'PASSWORD_CHANGED' : 'PASSWORD_CREATED',
         userId: user.id,
         username: user.username,
         ip: getIp(req),
-        detail: 'Senha adicionada a uma conta criada com Google',
+        detail: changingPassword
+          ? 'Senha alterada pelo titular na área da conta'
+          : 'Senha adicionada a uma conta criada com Google',
       });
       return res.json({
-        message:
-          'Senha criada com sucesso. Agora você também pode entrar usando e-mail/usuário e senha.',
+        message: changingPassword
+          ? 'Senha alterada com sucesso.'
+          : 'Senha criada com sucesso. Agora você também pode entrar usando e-mail/usuário e senha.',
       });
     } catch (error) {
       console.error('[set-password]', error);

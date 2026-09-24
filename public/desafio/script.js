@@ -106,7 +106,7 @@
         headers: { Accept: 'application/json' },
       });
       if (response.status === 401) {
-        window.location.href = '/';
+        window.location.href = '/login';
         return;
       }
       var data = await response.json().catch(function () {
@@ -233,7 +233,7 @@
         return {};
       });
       if (response.status === 401) {
-        window.location.href = '/';
+        window.location.href = '/login';
         return;
       }
       if (!response.ok || !(data.pergunta || data.question))
@@ -586,7 +586,7 @@
         return {};
       });
       if (response.status === 401) {
-        window.location.href = '/';
+        window.location.href = '/login';
         return;
       }
       if (!response.ok) throw new Error(result.erro || 'Não foi possível validar a resposta.');
@@ -672,13 +672,13 @@
   });
   el('restartBtn').addEventListener('click', restart);
   el('dashboardBtn').addEventListener('click', function () {
-    window.location.href = '/dashboard.html';
+    window.location.href = '/dashboard';
   });
   el('logoutBtn').addEventListener('click', async function () {
     try {
       await fetch('/api/logout', { method: 'POST' });
     } catch (error) {}
-    window.location.href = '/';
+    window.location.href = '/login';
   });
   var savedTheme = 'dark';
   try {

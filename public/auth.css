@@ -477,6 +477,33 @@ button:disabled {
 .consent-inline a {
   color: var(--accent-bright);
 }
+.remember-device {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.remember-device input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+.remember-device span,
+.remember-device strong {
+  display: block;
+}
+.remember-device strong {
+  margin-bottom: 2px;
+  color: var(--text-primary);
+  font-size: 0.72rem;
+}
 .terms-box {
   border: 1px solid var(--border);
   background: var(--bg-elevated);
@@ -836,6 +863,43 @@ body:not([data-page='dashboard']):not([data-page='account']):not([data-page='leg
   font-size: 0.61rem;
   line-height: 1.35;
 }
+.password-strength {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 7px;
+  margin: -2px 0 13px;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+.password-strength-track {
+  height: 5px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: transparent;
+}
+.password-strength-bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: #e45f68;
+  transition:
+    width 160ms ease,
+    background-color 160ms ease;
+}
+.password-strength.is-medium .password-strength-bar {
+  background: #d7a637;
+}
+.password-strength.is-strong .password-strength-bar {
+  background: var(--accent);
+}
+.password-strength strong {
+  color: var(--text-primary);
+  font-size: 0.7rem;
+}
+.password-strength small {
+  color: inherit;
+  line-height: 1.45;
+}
 .register-password-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -863,6 +927,9 @@ body:not([data-page='dashboard']):not([data-page='account']):not([data-page='leg
   gap: 12px;
   align-items: end;
 }
+.password-setup-grid .password-strength {
+  margin: 0;
+}
 .password-setup-grid .field {
   margin: 0;
 }
@@ -877,6 +944,20 @@ body[data-page='legal'] {
   height: auto;
   min-height: 100vh;
   overflow: auto;
+}
+
+body[data-page='register'] {
+  height: auto;
+  min-height: 100dvh;
+  grid-template-rows: auto minmax(min-content, 1fr) auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+body[data-page='register'] .auth-shell {
+  height: auto;
+  min-height: calc(100dvh - 140px);
+  padding-top: 34px;
+  padding-bottom: 34px;
 }
 
 @media (max-width: 900px) {
@@ -1011,6 +1092,9 @@ body[data-page='legal'] {
 .dashboard-hero h1 span {
   color: var(--accent-bright);
 }
+.dashboard-hero h1 .dashboard-greeting {
+  color: var(--text-primary);
+}
 .dashboard-hero p:not(.eyebrow) {
   max-width: 620px;
   margin: 14px 0 0;
@@ -1032,6 +1116,92 @@ body[data-page='legal'] {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.first-journey {
+  padding: 28px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-secondary) 96%, transparent);
+}
+.first-journey-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.first-journey-heading h2 {
+  margin: 6px 0 0;
+  font:
+    700 1.55rem 'Sora',
+    sans-serif;
+}
+.first-journey-heading p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+.trail-count {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.trail-card {
+  min-height: 190px;
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  align-items: center;
+  gap: 28px;
+  padding: 28px;
+  border: 1px solid var(--accent-line);
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--accent) 10%, transparent), transparent 52%),
+    var(--bg-elevated);
+}
+.trail-number {
+  color: transparent;
+  font:
+    700 3.8rem 'Sora',
+    sans-serif;
+  line-height: 1;
+  -webkit-text-stroke: 1px var(--accent-bright);
+}
+.trail-content h3 {
+  margin: 7px 0 8px;
+  font:
+    700 1.3rem 'Sora',
+    sans-serif;
+}
+.trail-content > p {
+  max-width: 580px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.65;
+}
+.trail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 18px;
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+}
+.trail-meta span:before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  display: inline-block;
+  margin: 0 7px 1px 0;
+  background: var(--accent-bright);
+}
+.trail-card .primary-button {
+  width: auto;
+  min-width: 180px;
+  padding: 0 20px;
 }
 .metric-grid {
   display: grid;
@@ -1421,6 +1591,13 @@ body[data-page='legal'] {
   .performance-layout {
     grid-template-columns: 170px 1fr;
   }
+  .trail-card {
+    grid-template-columns: 70px 1fr;
+  }
+  .trail-card .primary-button {
+    grid-column: 2;
+    justify-self: start;
+  }
   .challenge-row {
     grid-template-columns: 36px 1fr 100px 74px;
   }
@@ -1455,6 +1632,27 @@ body[data-page='legal'] {
   }
   .metric-grid {
     grid-template-columns: 1fr;
+  }
+  .first-journey {
+    padding: 18px;
+  }
+  .first-journey-heading {
+    display: block;
+  }
+  .trail-count {
+    display: inline-block;
+    margin-top: 16px;
+  }
+  .trail-card {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+  .trail-number {
+    font-size: 2.8rem;
+  }
+  .trail-card .primary-button {
+    grid-column: 1;
+    width: 100%;
   }
   .metric-card {
     min-height: 112px;

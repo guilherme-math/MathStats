@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import selfsigned from 'selfsigned';
 import { applySecurityMiddlewares } from './middlewares/security';
-import { requirePageAuth } from './middlewares/auth';
+import { requirePageRole } from './middlewares/auth';
 import authRoutes from './routes/authRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import lgpdRoutes from './routes/lgpdRoutes';
@@ -23,15 +23,30 @@ app.use('/api', dashboardRoutes);
 app.use('/api', lgpdRoutes);
 app.use('/api', challengeRoutes);
 
-app.get('/desafio', requirePageAuth, (_req, res) => {
+const publicPages: Record<string, string> = {
+  '/login': 'login.html',
+  '/register': 'register.html',
+  '/recover': 'recover.html',
+  '/mfa': 'mfa.html',
+  '/politica-de-privacidade': 'politica-de-privacidade.html',
+  '/termos-de-uso': 'termos-de-uso.html',
+};
+
+for (const [route, file] of Object.entries(publicPages)) {
+  app.get(route, (_req, res) => {
+    res.sendFile(path.join(process.cwd(), 'public', file));
+  });
+}
+
+app.get('/desafio', requirePageRole('aluno'), (_req, res) => {
   res.sendFile(path.join(process.cwd(), 'protected', 'desafio.html'));
 });
 
-app.get(['/dashboard', '/dashboard.html'], requirePageAuth, (_req, res) => {
+app.get(['/dashboard', '/dashboard.html'], requirePageRole('aluno'), (_req, res) => {
   res.sendFile(path.join(process.cwd(), 'protected', 'dashboard.html'));
 });
 
-app.get(['/conta', '/conta.html'], requirePageAuth, (_req, res) => {
+app.get(['/conta', '/conta.html'], requirePageRole('aluno'), (_req, res) => {
   res.sendFile(path.join(process.cwd(), 'protected', 'conta.html'));
 });
 

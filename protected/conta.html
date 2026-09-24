@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
     <title>Conta e privacidade | MathStats</title>
     <meta
       name="description"
@@ -136,13 +137,29 @@
         <p class="feedback" id="profileCorrectionFeedback" role="alert"></p>
       </section>
 
-      <section class="account-card mt-3" id="passwordSetup" hidden>
-        <h3>Criar senha para esta conta</h3>
-        <p>
+      <section class="account-card mt-3" id="passwordSetup">
+        <h3 id="accountPasswordTitle">Gerenciar senha</h3>
+        <p id="accountPasswordDescription">
           Se sua conta foi criada com Google, você pode adicionar uma senha e manter as duas formas
           de acesso na mesma conta.
         </p>
         <form id="passwordSetupForm" class="password-setup-grid">
+          <div class="field" id="accountCurrentPasswordField" hidden>
+            <label for="accountCurrentPassword">Senha atual</label>
+            <div class="input-wrap">
+              <input
+                id="accountCurrentPassword"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Digite sua senha atual"
+              /><button
+                class="eye-button"
+                id="accountCurrentPasswordToggle"
+                type="button"
+                aria-label="Mostrar senha"
+              ></button>
+            </div>
+          </div>
           <div class="field">
             <label for="accountNewPassword">Nova senha</label>
             <div class="input-wrap">
@@ -150,7 +167,8 @@
                 id="accountNewPassword"
                 type="password"
                 autocomplete="new-password"
-                placeholder="Mínimo 8 caracteres"
+                placeholder="Crie uma senha segura"
+                maxlength="128"
               /><button
                 class="eye-button"
                 id="accountNewPasswordToggle"
@@ -175,8 +193,14 @@
               ></button>
             </div>
           </div>
+          <div
+            class="password-strength"
+            id="accountPasswordStrength"
+            aria-live="polite"
+            hidden
+          ></div>
           <button class="primary-button loading-button" id="accountPasswordBtn" type="submit">
-            CRIAR SENHA
+            SALVAR SENHA
           </button>
         </form>
         <p class="feedback" id="accountPasswordFeedback" role="alert"></p>
@@ -203,8 +227,8 @@
           <strong>MATH/STATS</strong><span>Aprendizado orientado por dados esportivos.</span>
         </div>
         <nav aria-label="Links legais">
-          <a href="/politica-de-privacidade.html">Política de Privacidade</a
-          ><a href="/termos-de-uso.html">Termos de Uso</a>
+          <a href="/politica-de-privacidade">Política de Privacidade</a
+          ><a href="/termos-de-uso">Termos de Uso</a>
         </nav>
         <span class="site-footer-copy">© 2026 MATH/STATS</span>
       </div>

@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { UserModel } from '../models/userModel';
 import { sendRecoveryCodeEmail } from '../utils/mailer';
 import { audit } from '../utils/auditLogger';
+import { isPasswordValid, PASSWORD_POLICY_MESSAGE } from '../utils/passwordPolicy';
 import type { AppSession } from '../types/session';
 import type { Timestamp } from 'firebase-admin/firestore';
 
@@ -160,8 +161,8 @@ export const RecoveryController = {
         .status(401)
         .json({ error: 'Sessão inválida. Reinicie o processo de recuperação de senha.' });
     }
-    if (!password || password.length < 8) {
-      return res.status(400).json({ error: 'A nova senha deve ter no mínimo 8 caracteres.' });
+    if (!isPasswordValid(password)) {
+      return res.status(400).json({ error: PASSWORD_POLICY_MESSAGE });
     }
 
     try {

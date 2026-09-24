@@ -19,7 +19,8 @@ export type AuditEvent =
   | 'LGPD_ACCOUNT_DELETED'
   | 'CHALLENGE_ANSWERED'
   | 'GOOGLE_LINKED'
-  | 'PASSWORD_CREATED';
+  | 'PASSWORD_CREATED'
+  | 'PASSWORD_CHANGED';
 
 export interface AuditLogEntry {
   event: AuditEvent;

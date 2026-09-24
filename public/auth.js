@@ -115,6 +115,27 @@
     return { response: response, data: data };
   }
 
+  function consumeEmailCode() {
+    var params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    var code = params.get('email-code') || '';
+    if (!/^\d{6}$/.test(code)) return '';
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    return code;
+  }
+
+  function handleExpiredMfaSession(result) {
+    var message = String(result.data.error || '').toLocaleLowerCase('pt-BR');
+    var expired =
+      (result.response.status === 401 || result.response.status === 403) &&
+      message.indexOf('sessão expirada') !== -1;
+    if (!expired) return false;
+    setFeedback('mfaFeedback', 'Sua sessão expirou. Faça login novamente.');
+    window.setTimeout(function () {
+      window.location.href = '/login';
+    }, 1800);
+    return true;
+  }
+
   function bindPasswordToggle(inputId, buttonId) {
     var input = el(inputId);
     var button = el(buttonId);
@@ -126,6 +147,74 @@
       button.innerHTML = showing ? EYE_OPEN : EYE_CLOSED;
       button.setAttribute('aria-label', showing ? 'Mostrar senha' : 'Ocultar senha');
     });
+  }
+
+  function passwordRequirements(password) {
+    return {
+      minimumLength: password.length >= 8 && password.length <= 128,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /\d/.test(password),
+      specialCharacter: /[^A-Za-z0-9\s]/.test(password),
+    };
+  }
+
+  function passwordPolicyError(password) {
+    var requirements = passwordRequirements(password);
+    var valid = Object.keys(requirements).every(function (key) {
+      return requirements[key];
+    });
+    return valid
+      ? ''
+      : 'A senha deve ter pelo menos 8 caracteres, com letra maiúscula, letra minúscula, número e caractere especial.';
+  }
+
+  function renderPasswordStrength(input, container) {
+    var password = input.value;
+    if (!password) {
+      container.hidden = true;
+      container.className = 'password-strength';
+      container.innerHTML = '';
+      return;
+    }
+
+    container.hidden = false;
+    var requirements = passwordRequirements(password);
+    var score = Object.keys(requirements).filter(function (key) {
+      return requirements[key];
+    }).length;
+    var state = score === 5 ? 'strong' : score >= 3 ? 'medium' : 'weak';
+    var label =
+      state === 'strong' ? 'Senha forte' : state === 'medium' ? 'Senha média' : 'Senha fraca';
+    var missing = [];
+    if (!requirements.minimumLength) missing.push('8 ou mais caracteres');
+    if (!requirements.uppercase) missing.push('letra maiúscula');
+    if (!requirements.lowercase) missing.push('letra minúscula');
+    if (!requirements.number) missing.push('número');
+    if (!requirements.specialCharacter) missing.push('caractere especial');
+
+    container.className = 'password-strength is-' + state;
+    container.innerHTML =
+      '<span class="password-strength-track"><span class="password-strength-bar" style="width:' +
+      score * 20 +
+      '%"></span></span><strong>' +
+      label +
+      '</strong><small>' +
+      (missing.length
+        ? 'Falta: ' + missing.join(', ') + '.'
+        : 'Todos os requisitos foram atendidos.') +
+      '</small>';
+  }
+
+  function bindPasswordStrength(inputId, containerId) {
+    var input = el(inputId);
+    var container = el(containerId);
+    if (!input || !container) return;
+    var update = function () {
+      renderPasswordStrength(input, container);
+    };
+    input.addEventListener('input', update);
+    update();
   }
 
   async function redirectIfAuthenticated() {
@@ -227,12 +316,8 @@
         }),
       });
 
-      if (result.response.ok && result.data.created && result.data.qrCodeUrl) {
-        showRegistrationSuccess(result.data.qrCodeUrl);
-        return;
-      }
-      if (result.response.ok && result.data.require2FA) {
-        window.location.href = '/mfa.html';
+      if (result.response.ok && result.data.authenticated) {
+        window.location.href = '/dashboard';
         return;
       }
 
@@ -279,7 +364,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        if (result.response.ok && result.data.require2FA) window.location.href = '/mfa.html';
+        if (result.response.ok && result.data.authenticated) window.location.href = '/dashboard';
+        else if (result.response.ok && result.data.require2FA) window.location.href = '/mfa';
         else
           setFeedback(
             'loginFeedback',
@@ -299,6 +385,7 @@
   function initRegister() {
     bindPasswordToggle('signupPass', 'signupPassToggle');
     bindPasswordToggle('signupConfirm', 'signupConfirmToggle');
+    bindPasswordStrength('signupPass', 'signupPasswordStrength');
     var form = el('registerForm');
     if (!form) return;
 
@@ -337,8 +424,9 @@
         setFeedback('signupFeedback', contentError);
         return;
       }
-      if (password.length < 8) {
-        setFeedback('signupFeedback', 'A senha deve ter no mínimo 8 caracteres.');
+      var passwordError = passwordPolicyError(password);
+      if (passwordError) {
+        setFeedback('signupFeedback', passwordError);
         return;
       }
       if (password !== confirm) {
@@ -402,6 +490,15 @@
     });
     setMfaMethod('app');
 
+    var linkedCode = consumeEmailCode();
+    if (linkedCode) {
+      setMfaMethod('email');
+      el('emailStep1').hidden = true;
+      el('emailStep2').hidden = false;
+      el('mfaEmailCode').value = linkedCode;
+      setFeedback('mfaFeedback', 'Código preenchido. Confirme para concluir o acesso.', true);
+    }
+
     el('mfaAppForm').addEventListener('submit', async function (event) {
       event.preventDefault();
       var code = el('mfaCode').value.trim();
@@ -415,10 +512,14 @@
         var result = await requestJson('/api/verify-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: code }),
+          body: JSON.stringify({
+            token: code,
+            rememberDevice: el('rememberDevice').checked,
+          }),
         });
         if (result.response.ok) window.location.href = '/dashboard';
-        else setFeedback('mfaFeedback', result.data.error || 'Código inválido.');
+        else if (!handleExpiredMfaSession(result))
+          setFeedback('mfaFeedback', result.data.error || 'Código inválido.');
       } catch (error) {
         setFeedback('mfaFeedback', 'Não foi possível conectar ao servidor.');
       } finally {
@@ -438,7 +539,8 @@
           el('emailStep1').hidden = true;
           el('emailStep2').hidden = false;
           setFeedback('mfaFeedback', result.data.message || 'Código enviado.', true);
-        } else setFeedback('mfaFeedback', result.data.error || 'Não foi possível enviar o código.');
+        } else if (!handleExpiredMfaSession(result))
+          setFeedback('mfaFeedback', result.data.error || 'Não foi possível enviar o código.');
       } catch (error) {
         setFeedback('mfaFeedback', 'Não foi possível conectar ao servidor.');
       } finally {
@@ -459,10 +561,15 @@
         var result = await requestJson('/api/verify-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: code, method: 'email' }),
+          body: JSON.stringify({
+            token: code,
+            method: 'email',
+            rememberDevice: el('rememberDevice').checked,
+          }),
         });
         if (result.response.ok) window.location.href = '/dashboard';
-        else setFeedback('mfaFeedback', result.data.error || 'Código inválido.');
+        else if (!handleExpiredMfaSession(result))
+          setFeedback('mfaFeedback', result.data.error || 'Código inválido.');
       } catch (error) {
         setFeedback('mfaFeedback', 'Não foi possível conectar ao servidor.');
       } finally {
@@ -482,6 +589,13 @@
 
   function initRecover() {
     updateRecoveryStep(1);
+
+    var linkedCode = consumeEmailCode();
+    if (linkedCode) {
+      updateRecoveryStep(2);
+      el('recoverCode').value = linkedCode;
+      setFeedback('recoverFeedback2', 'Código preenchido. Confirme para continuar.', true);
+    }
 
     el('recoverForm1').addEventListener('submit', async function (event) {
       event.preventDefault();
@@ -541,13 +655,15 @@
 
     bindPasswordToggle('newPassword', 'newPasswordToggle');
     bindPasswordToggle('confirmPassword', 'confirmPasswordToggle');
+    bindPasswordStrength('newPassword', 'recoverPasswordStrength');
     el('recoverForm3').addEventListener('submit', async function (event) {
       event.preventDefault();
       var password = el('newPassword').value;
       var confirm = el('confirmPassword').value;
       var button = el('recoverBtn3');
-      if (password.length < 8) {
-        setFeedback('recoverFeedback3', 'A senha deve ter no mínimo 8 caracteres.');
+      var passwordError = passwordPolicyError(password);
+      if (passwordError) {
+        setFeedback('recoverFeedback3', passwordError);
         return;
       }
       if (password !== confirm) {
@@ -581,7 +697,7 @@
     try {
       await requestJson('/api/logout', { method: 'POST' });
     } catch (error) {}
-    window.location.href = '/';
+    window.location.href = '/login';
   }
 
   function renderLogs(logs) {
@@ -820,12 +936,18 @@
     var weekXp = Number(dashboard.xpLast7Days) || 0;
 
     if (el('dashboardName')) el('dashboardName').textContent = firstName;
+    if (el('dashboardGreeting'))
+      el('dashboardGreeting').textContent = answered > 0 ? 'Olá,' : 'Bem-vindo,';
     if (el('dashboardSubtitle')) {
       el('dashboardSubtitle').textContent =
         answered > 0
           ? 'Seu progresso está sendo calculado com seus dados reais de desafios. Continue a trilha para aumentar XP, ofensiva e aproveitamento.'
-          : 'Seu painel está pronto. Responda o primeiro desafio para começar a construir seu histórico de aprendizagem.';
+          : 'Faça sua primeira atividade e comece a construir seu histórico de aprendizagem.';
     }
+    if (el('firstJourney')) el('firstJourney').hidden = answered > 0;
+    if (el('dashboardProgress')) el('dashboardProgress').hidden = answered === 0;
+    if (el('openChallengeBtn'))
+      el('openChallengeBtn').textContent = answered > 0 ? 'CONTINUAR TRILHA' : 'COMEÇAR ATIVIDADE';
 
     if (el('metricXp')) el('metricXp').textContent = xp.toLocaleString('pt-BR');
     if (el('metricStreak')) el('metricStreak').textContent = '🔥 ' + streak;
@@ -867,20 +989,21 @@
     try {
       var session = await requestJson('/api/dashboard');
       if (!session.response.ok) {
-        window.location.href = '/';
+        window.location.href = '/login';
         return;
       }
       renderDashboardData(session.data.user, session.data.dashboard || {});
     } catch (error) {
-      window.location.href = '/';
+      window.location.href = '/login';
       return;
     }
 
-    if (el('openChallengeBtn')) {
-      el('openChallengeBtn').addEventListener('click', function () {
-        window.location.href = '/desafio';
-      });
-    }
+    ['openChallengeBtn', 'startFirstTrailBtn'].forEach(function (buttonId) {
+      if (el(buttonId))
+        el(buttonId).addEventListener('click', function () {
+          window.location.href = '/desafio';
+        });
+    });
   }
 
   async function initAccount() {
@@ -888,7 +1011,7 @@
     try {
       var session = await requestJson('/api/dashboard');
       if (!session.response.ok) {
-        window.location.href = '/';
+        window.location.href = '/login';
         return;
       }
       currentUser = session.data.user;
@@ -913,25 +1036,42 @@
           ? 'Configurada'
           : 'Ainda não criada';
 
-      if (!currentUser.hasPassword && el('passwordSetup')) {
-        el('passwordSetup').hidden = false;
-        bindPasswordToggle('accountNewPassword', 'accountNewPasswordToggle');
-        bindPasswordToggle('accountConfirmPassword', 'accountConfirmPasswordToggle');
+      bindPasswordToggle('accountCurrentPassword', 'accountCurrentPasswordToggle');
+      bindPasswordToggle('accountNewPassword', 'accountNewPasswordToggle');
+      bindPasswordToggle('accountConfirmPassword', 'accountConfirmPasswordToggle');
+      bindPasswordStrength('accountNewPassword', 'accountPasswordStrength');
+
+      if (currentUser.hasPassword) {
+        if (el('accountCurrentPasswordField')) el('accountCurrentPasswordField').hidden = false;
+        if (el('accountPasswordTitle')) el('accountPasswordTitle').textContent = 'Alterar senha';
+        if (el('accountPasswordDescription'))
+          el('accountPasswordDescription').textContent =
+            'Confirme sua senha atual e escolha uma nova senha para proteger sua conta.';
+        if (el('accountPasswordBtn')) el('accountPasswordBtn').textContent = 'ALTERAR SENHA';
+      } else {
+        if (el('accountPasswordTitle')) el('accountPasswordTitle').textContent = 'Criar senha';
+        if (el('accountPasswordBtn')) el('accountPasswordBtn').textContent = 'CRIAR SENHA';
       }
     } catch (error) {
-      window.location.href = '/';
+      window.location.href = '/login';
       return;
     }
 
     if (el('passwordSetupForm')) {
       el('passwordSetupForm').addEventListener('submit', async function (event) {
         event.preventDefault();
+        var currentPassword = el('accountCurrentPassword').value;
         var password = el('accountNewPassword').value;
         var confirm = el('accountConfirmPassword').value;
         var button = el('accountPasswordBtn');
 
-        if (password.length < 8) {
-          setFeedback('accountPasswordFeedback', 'A senha deve ter no mínimo 8 caracteres.');
+        if (currentUser.hasPassword && !currentPassword) {
+          setFeedback('accountPasswordFeedback', 'Digite sua senha atual.');
+          return;
+        }
+        var passwordError = passwordPolicyError(password);
+        if (passwordError) {
+          setFeedback('accountPasswordFeedback', passwordError);
           return;
         }
         if (password !== confirm) {
@@ -944,12 +1084,21 @@
           var result = await requestJson('/api/account/password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: password }),
+            body: JSON.stringify({ currentPassword: currentPassword, password: password }),
           });
           if (result.response.ok) {
-            setFeedback('accountPasswordFeedback', result.data.message || 'Senha criada.', true);
+            setFeedback('accountPasswordFeedback', result.data.message || 'Senha salva.', true);
             if (el('profilePassword')) el('profilePassword').textContent = 'Configurada';
-            el('passwordSetup').hidden = true;
+            currentUser.hasPassword = true;
+            el('accountCurrentPassword').value = '';
+            el('accountNewPassword').value = '';
+            el('accountConfirmPassword').value = '';
+            el('accountCurrentPasswordField').hidden = false;
+            el('accountPasswordTitle').textContent = 'Alterar senha';
+            el('accountPasswordDescription').textContent =
+              'Confirme sua senha atual e escolha uma nova senha para proteger sua conta.';
+            el('accountPasswordBtn').textContent = 'ALTERAR SENHA';
+            renderPasswordStrength(el('accountNewPassword'), el('accountPasswordStrength'));
           } else
             setFeedback(
               'accountPasswordFeedback',
@@ -1116,7 +1265,7 @@
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
         });
-        if (result.response.ok) window.location.href = '/';
+        if (result.response.ok) window.location.href = '/login';
         else
           setFeedback('accountFeedback', result.data.error || 'Não foi possível excluir a conta.');
       });

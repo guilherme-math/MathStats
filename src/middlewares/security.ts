@@ -4,7 +4,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import cors from 'cors';
 import path from 'path';
-import MongoStore from 'connect-mongo';
+import { FirestoreSessionStore } from '../stores/firestoreSessionStore';
 
 const REQUIRED_ENVIRONMENT_VARIABLES = [
   'SESSION_SECRET',
@@ -53,16 +53,7 @@ export function applySecurityMiddlewares(app: express.Application) {
   app.use(express.json({ limit: '10kb' }));
   app.use(express.static(path.join(process.cwd(), 'public'), { redirect: false }));
 
-  const sessionStore =
-    process.env.MONGODB_URI && process.env.NODE_ENV !== 'test'
-      ? MongoStore.create({
-          mongoUrl: process.env.MONGODB_URI,
-          dbName: process.env.MONGODB_DB || 'mathstats',
-          collectionName: 'sessions',
-          ttl: 15 * 60,
-          autoRemove: 'native',
-        })
-      : undefined;
+  const sessionStore = process.env.NODE_ENV === 'test' ? undefined : new FirestoreSessionStore();
 
   app.use(
     session({

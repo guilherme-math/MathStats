@@ -1,16 +1,18 @@
 # MathStats
 
-Plataforma educacional de matemática e estatística contextualizada com dados de futebol, desenvolvida como PFC.
+Plataforma educacional de matemática e estatística contextualizada com dados de futebol.
 
 ## Estado atual
 
 - Frontend em HTML5, CSS, JavaScript Vanilla e Bootstrap 5.
 - Backend em Node.js, Express e TypeScript.
 - Contas, progresso, tentativas e solicitações LGPD no Firebase Firestore.
-- Sessões persistentes e auditoria no MongoDB Atlas.
+- Sessões persistentes no Firebase Firestore e auditoria no MongoDB Atlas.
 - Senhas com Argon2id; segredo TOTP com AES-256-GCM.
 - 2FA por aplicativo autenticador ou código por e-mail.
+- Reconhecimento opcional do dispositivo por 30 dias após um 2FA válido.
 - Login opcional com Google Identity.
+- Perfil funcional `aluno` aplicado a todas as contas desta versão.
 - Desafios baseados na API-Football.
 - XP, ofensiva, tentativas e dashboard persistentes por usuário.
 - Consulta, exportação completa, atualização do nome de exibição, exclusão e acompanhamento de solicitações LGPD.
@@ -19,12 +21,13 @@ Plataforma educacional de matemática e estatística contextualizada com dados d
 ## Jornada atual
 
 ```text
-Cadastro → configuração do 2FA → login → 2FA → Dashboard
-                                              ├─ Trilha de desafios
-                                              └─ Conta e privacidade
+Home ─┬─ Cadastro → configuração do 2FA → login → 2FA → Dashboard
+      └─ Login → 2FA ──────────────────────────────────────┤
+                                                          ├─ Trilha de desafios
+                                                          └─ Conta e privacidade
 ```
 
-Depois do 2FA, o usuário é direcionado para `/dashboard`. Perfil, segurança e direitos LGPD ficam em `/conta`. Sem sessão, `/dashboard`, `/conta`, `/desafio` e as APIs privadas recusam o acesso.
+A página inicial fica em `/` e o acesso em `/login`. Depois do 2FA, o usuário é direcionado para `/dashboard`. Perfil, segurança e direitos LGPD ficam em `/conta`. Sem sessão, `/dashboard`, `/conta`, `/desafio` e as APIs privadas recusam o acesso.
 
 ## Desenvolvimento local
 
@@ -51,7 +54,7 @@ npm start      executa a compilação local
 - `users/{userId}/attempts`: histórico completo de desafios.
 - `users/{userId}/privacyRequests`: histórico de solicitações de direitos, sem sobrescrever pedidos anteriores.
 - `auditLogs`: eventos de segurança com TTL padrão de 180 dias.
-- `sessions`: sessões persistentes com TTL de 15 minutos.
+- `sessions`: sessões persistentes no Firestore com expiração de 15 minutos.
 
 Novos cadastros registram as versões dos Termos e da Política definidas em `src/config/legalDocuments.ts`. Contas antigas permanecem identificadas como aceite legado sem versão.
 
@@ -67,7 +70,7 @@ Configure estas variáveis em **Project → Settings → Environment Variables**
 
 ```text
 NODE_ENV=production
-APP_BASE_URL=https://SEU-PROJETO.vercel.app
+APP_BASE_URL=https://mathstats.vercel.app
 SESSION_SECRET
 SESSION_COOKIE_NAME=mathstats.sid
 ENCRYPTION_KEY
@@ -90,7 +93,8 @@ Depois da primeira publicação, adicione a URL final da Vercel às origens auto
 ## Documentação LGPD
 
 - `docs/LGPD_MATRIZ.md`: inventário, finalidades, fornecedores, retenção e direitos.
-- `docs/PLANO_RESPOSTA_INCIDENTES.md`: procedimento acadêmico de resposta a incidentes.
+- `docs/PLANO_RESPOSTA_INCIDENTES.md`: procedimento de resposta a incidentes.
+- `docs/API_FOOTBALL.md`: funcionamento da integração esportiva.
 - `public/politica-de-privacidade.html`: política apresentada aos usuários.
 - `public/termos-de-uso.html`: condições de utilização.
 

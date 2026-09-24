@@ -35,8 +35,8 @@ function emailLayout(content: string): string {
           <tr><td>${content}</td></tr>
           <tr><td align="center" style="padding:52px 0 8px;color:#8a938f;font-size:12px;">© 2026 MATH/STATS</td></tr>
           <tr><td align="center" style="padding:8px 0 24px;font-size:12px;">
-            <a href="${appBaseUrl}/politica-de-privacidade.html" style="color:#1f6fd1;text-decoration:none;margin:0 10px;">Política de Privacidade</a>
-            <a href="${appBaseUrl}/termos-de-uso.html" style="color:#1f6fd1;text-decoration:none;margin:0 10px;">Termos de Uso</a>
+            <a href="${appBaseUrl}/politica-de-privacidade" style="color:#1f6fd1;text-decoration:none;margin:0 10px;">Política de Privacidade</a>
+            <a href="${appBaseUrl}/termos-de-uso" style="color:#1f6fd1;text-decoration:none;margin:0 10px;">Termos de Uso</a>
           </td></tr>
         </table>
       </td></tr>
@@ -47,15 +47,18 @@ function emailLayout(content: string): string {
 
 function verificationEmail(username: string, code: string, purpose: 'login' | 'recovery'): string {
   const safeName = escapeHtml(username);
-  const safeCode = escapeHtml(code.split('').join('  '));
+  const safeCode = escapeHtml(code);
   const isLogin = purpose === 'login';
+  const destination = isLogin ? 'mfa' : 'recover';
+  const actionUrl = `${appBaseUrl}/${destination}#email-code=${encodeURIComponent(code)}`;
 
   return emailLayout(`
     <div style="text-align:center;">
       <p style="margin:0 0 10px;font-size:15px;color:#5e6964;">Olá, <strong style="color:#171c19;">${safeName}</strong>.</p>
       <h1 style="margin:0 0 34px;font-size:24px;font-weight:700;color:#171c19;">${isLogin ? 'Seu código de verificação' : 'Código para redefinir sua senha'}</h1>
       <p style="margin:0 0 18px;font-size:14px;color:#4d5752;">${isLogin ? 'Use o código abaixo para concluir seu acesso ao MathStats:' : 'Use o código abaixo para continuar a recuperação da sua conta:'}</p>
-      <div style="display:inline-block;margin:0 auto 22px;padding:18px 26px;border:1px solid #dfe6e2;background:#f7faf8;font-size:30px;line-height:1;font-weight:800;letter-spacing:5px;color:#07110d;">${safeCode}</div>
+      <a href="${actionUrl}" title="Abrir o MathStats com o código preenchido" style="display:inline-block;margin:0 auto 10px;padding:18px 26px;border:1px solid #dfe6e2;background:#f7faf8;font-size:30px;line-height:1;font-weight:800;letter-spacing:3px;color:#07110d;text-decoration:none;user-select:all;cursor:pointer;">${safeCode}</a>
+      <p style="margin:0 0 22px;font-size:12px;color:#68736e;">Clique no código para abrir o MathStats com o campo preenchido.</p>
       <p style="margin:0;font-size:13px;line-height:1.7;color:#4d5752;">Este código só pode ser usado no fluxo atual e expira em <strong>15 minutos</strong>.</p>
       <p style="margin:34px 0 0;font-size:12px;line-height:1.7;color:#8a938f;">${isLogin ? 'Se você não tentou entrar no MathStats, ignore este e-mail e considere alterar sua senha.' : 'Se você não solicitou a recuperação de senha, ignore este e-mail. Sua senha atual permanece a mesma.'}</p>
     </div>`);

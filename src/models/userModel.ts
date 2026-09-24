@@ -5,6 +5,7 @@ import type {
   QueryDocumentSnapshot,
   Timestamp,
 } from 'firebase-admin/firestore';
+import { DEFAULT_USER_ROLE, normalizeUserRole, type UserRole } from '../config/userRoles';
 
 export interface User {
   id: string;
@@ -13,6 +14,7 @@ export interface User {
   usernameNormalized?: string;
   email: string;
   emailNormalized?: string;
+  role: UserRole;
   passwordHash: string;
   twoFactorSecret: string;
   legalAcceptedAt?: Timestamp | Date;
@@ -94,6 +96,7 @@ async function normalizeStoredUser(doc: DocumentSnapshot): Promise<User> {
   if (typeof data.streak !== 'number') patch.streak = 0;
   if (typeof data.challengesAnswered !== 'number') patch.challengesAnswered = 0;
   if (typeof data.challengesCorrect !== 'number') patch.challengesCorrect = 0;
+  if (data.role !== normalizeUserRole(data.role)) patch.role = DEFAULT_USER_ROLE;
 
   if (Object.keys(patch).length) {
     await doc.ref.set(patch, { merge: true }).catch(() => {});
@@ -178,6 +181,7 @@ export const UserModel = {
       usernameNormalized: username,
       email,
       emailNormalized: email,
+      role: DEFAULT_USER_ROLE,
       xpTotal: 0,
       streak: 0,
       lastStudyDate: null,
@@ -194,6 +198,7 @@ export const UserModel = {
       usernameNormalized: username,
       email,
       emailNormalized: email,
+      role: DEFAULT_USER_ROLE,
       xpTotal: 0,
       streak: 0,
       lastStudyDate: null,

@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
     <title>Criar conta | MathStats</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -50,19 +51,14 @@
           <p class="eyebrow">NOVO PERFIL / CONFIGURAÇÃO</p>
           <h1>CRIE SUA<br /><span>CONTA</span></h1>
           <p>
-            Cadastre-se com Google ou com e-mail e senha. Em ambos os casos, o MathStats mantém
-            autenticação em duas etapas e sessão protegida.
+            Cadastre-se com Google ou com e-mail e senha. Contas com senha usam autenticação em duas
+            etapas; o acesso com Google utiliza a verificação da própria conta Google.
           </p>
-          <div class="feature-strip">
-            <div><strong>ARGON2ID</strong><small>Hash seguro de senha</small></div>
-            <div><strong>AES-256-GCM</strong><small>Segredo do 2FA protegido</small></div>
-            <div><strong>2FA</strong><small>App ou e-mail</small></div>
-          </div>
         </section>
 
         <section class="auth-card auth-card-register" aria-labelledby="registerTitle">
           <div class="auth-card-body">
-            <span class="card-code">CADASTRO / 01</span>
+            <span class="card-code">CADASTRO</span>
             <h2 id="registerTitle">Criar acesso</h2>
             <p class="card-intro">
               Defina como seu nome será exibido e escolha seu usuário de acesso.
@@ -76,7 +72,7 @@
                     type="text"
                     autocomplete="name"
                     maxlength="60"
-                    placeholder="Guilherme Rodrigues"
+                    placeholder="Ex: João Silva"
                   />
                 </div>
                 <div class="field">
@@ -86,7 +82,7 @@
                     type="text"
                     autocomplete="username"
                     maxlength="24"
-                    placeholder="guilherme"
+                    placeholder="Ex: joao.silva"
                     autocapitalize="none"
                     spellcheck="false"
                   />
@@ -119,8 +115,8 @@
               <label class="consent-inline"
                 ><input type="checkbox" id="lgpdCheck" /><span
                   >Li e concordo com os
-                  <a href="/termos-de-uso.html" target="_blank" rel="noopener">Termos de Uso</a> e a
-                  <a href="/politica-de-privacidade.html" target="_blank" rel="noopener"
+                  <a href="/termos-de-uso" target="_blank" rel="noopener">Termos de Uso</a> e a
+                  <a href="/politica-de-privacidade" target="_blank" rel="noopener"
                     >Política de Privacidade</a
                   >. Este aceite registra a ciência dos documentos e não substitui as bases legais
                   aplicáveis a cada tratamento.</span
@@ -152,7 +148,8 @@
                       id="signupPass"
                       type="password"
                       autocomplete="new-password"
-                      placeholder="Mínimo 8 caracteres"
+                      placeholder="Crie uma senha segura"
+                      maxlength="128"
                     /><button
                       class="eye-button"
                       id="signupPassToggle"
@@ -178,6 +175,12 @@
                   </div>
                 </div>
               </div>
+              <div
+                class="password-strength"
+                id="signupPasswordStrength"
+                aria-live="polite"
+                hidden
+              ></div>
 
               <button class="primary-button loading-button" id="signupBtn" type="submit">
                 CRIAR CONTA COM E-MAIL
@@ -193,11 +196,11 @@
               </p>
               <img id="qrCodeImg" alt="QR Code para configuração do 2FA" /><a
                 class="primary-button d-inline-flex align-items-center justify-content-center"
-                href="/"
+                href="/login"
                 >IR PARA O LOGIN</a
               >
             </div>
-            <div class="auth-links"><a href="/">← VOLTAR AO LOGIN</a></div>
+            <div class="auth-links"><a href="/login">← VOLTAR AO LOGIN</a></div>
           </div>
         </section>
       </div>
@@ -208,8 +211,8 @@
           <strong>MATH/STATS</strong><span>Aprendizado orientado por dados esportivos.</span>
         </div>
         <nav aria-label="Links legais">
-          <a href="/politica-de-privacidade.html">Política de Privacidade</a
-          ><a href="/termos-de-uso.html">Termos de Uso</a>
+          <a href="/politica-de-privacidade">Política de Privacidade</a
+          ><a href="/termos-de-uso">Termos de Uso</a>
         </nav>
         <span class="site-footer-copy">© 2026 MATH/STATS</span>
       </div>

@@ -9,7 +9,7 @@ test('páginas privadas redirecionam visitante para o login', async () => {
   for (const route of ['/dashboard', '/conta', '/desafio']) {
     const response = await request(app).get(route);
     assert.equal(response.status, 302, route);
-    assert.equal(response.headers.location, '/');
+    assert.equal(response.headers.location, '/login');
   }
 });
 
@@ -26,7 +26,21 @@ test('APIs privadas recusam requisição sem sessão', async () => {
 });
 
 test('documentos legais continuam públicos', async () => {
-  const response = await request(app).get('/politica-de-privacidade.html');
+  const response = await request(app).get('/politica-de-privacidade');
   assert.equal(response.status, 200);
   assert.match(response.text, /180 dias/);
+});
+
+test('páginas públicas usam endereços sem extensão HTML', async () => {
+  for (const route of [
+    '/login',
+    '/register',
+    '/recover',
+    '/mfa',
+    '/politica-de-privacidade',
+    '/termos-de-uso',
+  ]) {
+    const response = await request(app).get(route);
+    assert.equal(response.status, 200, route);
+  }
 });
