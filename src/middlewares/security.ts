@@ -121,3 +121,19 @@ export const lgpdLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Muitas requisições. Aguarde 15 minutos.' },
 });
+
+export const challengeGenerationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { erro: 'Limite de geração de desafios atingido. Aguarde 15 minutos.' },
+});
+
+export const challengeAnswerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { erro: 'Limite de respostas atingido. Aguarde 15 minutos.' },
+});

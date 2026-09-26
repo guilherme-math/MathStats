@@ -13,6 +13,12 @@ function loadCredential(): ServiceAccount {
   const inlineJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (inlineJson) return JSON.parse(inlineJson) as ServiceAccount;
 
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Defina FIREBASE_SERVICE_ACCOUNT_JSON ou FIREBASE_SERVICE_ACCOUNT_BASE64 em produção.',
+    );
+  }
+
   const keyPath = path.resolve(process.cwd(), process.env.FIREBASE_KEY_PATH || 'firebase-key.json');
   if (!fs.existsSync(keyPath)) {
     throw new Error(

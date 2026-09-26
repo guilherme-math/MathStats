@@ -19,7 +19,7 @@ O MathStats utiliza dados reais de futebol para montar atividades de matemática
 5. O MathStats gera desafios de média, porcentagem, proporção e interpretação de dados.
 6. A resposta e o progresso são salvos no Firestore.
 
-Os resultados da consulta permanecem em cache por cinco minutos em cada instância do servidor. Isso reduz chamadas repetidas e evita consumo desnecessário da API.
+Os resultados da consulta permanecem em cache por cinco minutos em cada instância do servidor. Se o provedor ficar temporariamente indisponível, o backend pode reutilizar por até 24 horas a última resposta válida. A consulta possui tempo limite de cinco segundos e uma nova tentativa para falhas de rede ou erros do provedor.
 
 ## Dados pessoais
 
@@ -27,11 +27,13 @@ Nenhum dado pessoal é enviado para a API-Football. A requisição contém apena
 
 ## Tratamento de falhas
 
-O backend informa quando não existem partidas suficientes para gerar a trilha. Erros de comunicação com o serviço retornam uma mensagem genérica, sem expor a chave ou detalhes internos.
+O backend valida a estrutura recebida antes de utilizar os dados. Se não houver partidas suficientes, informa que a trilha não pode ser gerada. Erros de comunicação retornam uma mensagem genérica, sem expor a chave ou detalhes internos. A criação de desafios aceita somente índices de 1 a 5, possui limite de 20 requisições a cada 15 minutos e registra sucessos e falhas na auditoria.
 
 ## Arquivos relacionados
 
 - `src/controllers/challengeController.ts`
+- `src/services/footballService.ts`
+- `src/validation/challengeSchemas.ts`
 - `src/routes/challengeRoutes.ts`
 - `public/desafio/script.js`
 - `public/desafio/style.css`

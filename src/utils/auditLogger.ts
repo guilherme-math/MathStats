@@ -20,7 +20,9 @@ export type AuditEvent =
   | 'CHALLENGE_ANSWERED'
   | 'GOOGLE_LINKED'
   | 'PASSWORD_CREATED'
-  | 'PASSWORD_CHANGED';
+  | 'PASSWORD_CHANGED'
+  | 'CHALLENGE_CREATED'
+  | 'CHALLENGE_GENERATION_FAILED';
 
 export interface AuditLogEntry {
   event: AuditEvent;

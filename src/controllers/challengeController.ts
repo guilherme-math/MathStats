@@ -1,63 +1,35 @@
 import { Request, Response } from 'express';
-import axios from 'axios';
 import { db } from '../config/firebase';
 import { audit } from '../utils/auditLogger';
 import type { AppSession } from '../types/session';
 import { registerStudyDay } from '../utils/streak';
 import type { Transaction } from 'firebase-admin/firestore';
-
-let cacheJogos: any[] | null = null;
-let cacheCriadoEm = 0;
-
-const CACHE_TEMPO = 5 * 60 * 1000;
+import { getRecentTeamMatches } from '../services/footballService';
+import {
+  challengeAnswerSchema,
+  challengeIdSchema,
+  challengeIndexSchema,
+} from '../validation/challengeSchemas';
 
 export const gerarDesafio = async (req: Request, res: Response) => {
   try {
-    const indice = Number(req.query.indice) || 1;
+    const parsedIndex = challengeIndexSchema.safeParse(req.query.indice);
+    if (!parsedIndex.success) {
+      return res.status(400).json({ erro: 'O índice do desafio deve estar entre 1 e 5.' });
+    }
+
+    const indice = parsedIndex.data;
     const teamId = 127;
     const session = req.session as AppSession;
     const userId = session.userId!;
 
-    const url = 'https://v3.football.api-sports.io/fixtures?team=127&season=2024';
+    const jogos = await getRecentTeamMatches(teamId, 2024);
 
-    let partidas;
-
-    if (cacheJogos && Date.now() - cacheCriadoEm < CACHE_TEMPO) {
-      partidas = cacheJogos;
-    } else {
-      const response = await axios.get(url, {
-        headers: {
-          'x-apisports-key': process.env.API_FOOTBALL_KEY,
-        },
-      });
-
-      partidas = response.data.response;
-      cacheJogos = partidas;
-      cacheCriadoEm = Date.now();
-    }
-
-    if (!partidas || partidas.length === 0) {
-      return res.status(400).json({ erro: 'Nenhuma partida encontrada na API.' });
-    }
-
-    const jogosFinalizados = partidas.filter((p: any) => p.fixture.status.short === 'FT');
-    const ultimos5Jogos = jogosFinalizados.slice(-5);
-
-    if (ultimos5Jogos.length < 5) {
+    if (jogos.length < 5) {
       return res
         .status(400)
         .json({ erro: 'Não existem jogos finalizados suficientes para gerar a trilha.' });
     }
-
-    const jogos = ultimos5Jogos.map((partida: any) => {
-      const mandante = partida.teams.home.id === teamId;
-
-      return {
-        adversario: mandante ? partida.teams.away.name : partida.teams.home.name,
-        gols: Number(mandante ? partida.goals.home : partida.goals.away) || 0,
-        golsAdversario: Number(mandante ? partida.goals.away : partida.goals.home) || 0,
-      };
-    });
 
     const totalGols = jogos.reduce((total: number, jogo: any) => total + jogo.gols, 0);
     const mediaGols = Number((totalGols / jogos.length).toFixed(2));
@@ -228,6 +200,14 @@ export const gerarDesafio = async (req: Request, res: Response) => {
       criadoEm: new Date(),
     });
 
+    await audit({
+      event: 'CHALLENGE_CREATED',
+      userId,
+      username: session.username,
+      ip: req.ip ?? req.socket?.remoteAddress ?? 'unknown',
+      detail: desafio.tipoDesafio,
+    });
+
     res.json({
       idDesafio: docRef.id,
       tipo: desafio.tipo,
@@ -244,22 +224,38 @@ export const gerarDesafio = async (req: Request, res: Response) => {
       options: desafio.options,
       tabela: desafio.tabela,
     });
-  } catch (error) {
-    console.error('Erro na requisição:', error);
-    res.status(500).json({ erro: 'Erro interno no servidor ao gerar o desafio.' });
+  } catch (error: any) {
+    const session = req.session as AppSession;
+    const statusCode = Number(error?.statusCode) || 500;
+    console.error('Erro ao gerar desafio:', error);
+    await audit({
+      event: 'CHALLENGE_GENERATION_FAILED',
+      userId: session.userId,
+      username: session.username,
+      ip: req.ip ?? req.socket?.remoteAddress ?? 'unknown',
+      detail: `status:${statusCode}`,
+    });
+    return res.status(statusCode).json({
+      erro:
+        statusCode === 503
+          ? 'Os dados esportivos estão indisponíveis no momento. Tente novamente em instantes.'
+          : 'Erro interno no servidor ao gerar o desafio.',
+    });
   }
 };
 
 export const responderDesafio = async (req: Request<{ id: string }>, res: Response) => {
   try {
-    const { id } = req.params;
-    const { resposta, usouDica = false } = req.body;
+    const parsedId = challengeIdSchema.safeParse(req.params.id);
+    const parsedBody = challengeAnswerSchema.safeParse(req.body);
+    if (!parsedId.success || !parsedBody.success) {
+      return res.status(400).json({ erro: 'Os dados enviados para o desafio são inválidos.' });
+    }
+
+    const id = parsedId.data;
+    const { resposta, usouDica } = parsedBody.data;
     const session = req.session as AppSession;
     const userId = session.userId!;
-
-    if (resposta === undefined || resposta === null || resposta === '') {
-      return res.status(400).json({ erro: 'Envie uma resposta antes de validar.' });
-    }
 
     const docRef = db.collection('challenges').doc(id);
     const userRef = db.collection('users').doc(userId);

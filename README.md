@@ -8,6 +8,8 @@ Plataforma educacional de matemática e estatística contextualizada com dados d
 - Backend em Node.js, Express e TypeScript.
 - Contas, progresso, tentativas e solicitações LGPD no Firebase Firestore.
 - Sessões persistentes no Firebase Firestore e auditoria no MongoDB Atlas.
+- Validação estruturada e limite de requisições nas rotas de desafios.
+- Cache com tolerância a falhas na integração com a API-Football.
 - Senhas com Argon2id; segredo TOTP com AES-256-GCM.
 - 2FA por aplicativo autenticador ou código por e-mail.
 - Reconhecimento opcional do dispositivo por 30 dias após um 2FA válido.
