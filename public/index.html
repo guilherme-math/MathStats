@@ -1,109 +1,89 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MathStats - Primeira Regra de Negócio</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Desafio do Dia | MathStats</title>
+  <meta name="description" content="Resolva desafios de matemática e estatística com dados de futebol no MathStats." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
 </head>
-<body class="bg-light">
-    <div class="container mt-5">
-        <div class="card shadow border-0">
-            <div class="card-header bg-primary text-white text-center py-3">
-                <h2 class="mb-0">MathStats - Motor de Desafios</h2>
-            </div>
-            <div class="card-body text-center p-5">
-                <button id="btnGerar" class="btn btn-lg btn-success mb-4 px-5">Gerar Desafio via API</button>
-
-                <div id="areaDesafio" class="d-none">
-                    <h4 class="text-secondary mt-3">Problema Matemático:</h4>
-                    <p id="pergunta" class="fs-4 fw-bold text-dark my-4"></p>
-                    <div class="alert alert-info text-start" id="dica"></div>
-
-                    <div class="input-group input-group-lg my-4">
-                        <input type="number" step="0.01" id="inputResposta" class="form-control" placeholder="Digite sua resposta">
-                        <button id="btnResponder" class="btn btn-primary">Responder</button>
-                    </div>
-
-                    <div id="areaResultado" class="d-none mt-3"></div>
-                </div>
-            </div>
-        </div>
+<body>
+  <div class="mesh" aria-hidden="true"><div class="mesh-plane"></div><div class="mesh-axis"></div></div>
+  <header class="topbar">
+    <div class="container-xl topbar-inner">
+      <a class="brand" href="#main" aria-label="MathStats — ir ao desafio">
+        <span class="brand-mark" aria-hidden="true">M<span>Σ</span></span>
+        <span class="brand-copy"><strong>MATH<span>/</span>STATS</strong><small>MATEMÁTICA E DADOS DE FUTEBOL</small></span>
+      </a>
+      <div class="challenge-marker d-none d-md-flex" aria-label="Progresso atual">
+        <small>DESAFIO DIÁRIO</small><strong><span id="headerChallengeIndex">01</span> / <span id="headerChallengeTotal">05</span></strong>
+      </div>
+      <div class="stats-group">
+        <span class="stat-chip" id="xpChip"><small>XP</small><strong id="xpValue">1.240</strong></span>
+        <span class="stat-chip streak" id="streakChip"><small>OFENSIVA</small><strong><span aria-hidden="true">🔥</span> 7</strong></span>
+        <button class="theme-toggle" type="button" id="themeToggle" aria-label="Ativar modo claro" title="Ativar modo claro">
+          <svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.5A8.4 8.4 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5z"></path></svg>
+          <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+        </button>
+      </div>
     </div>
+  </header>
 
-    <script>
-        let idDesafioAtual = null;
-        const API_BASE = '/api';
+  <main id="main" class="container-xl">
+    <section class="progress-section" aria-label="Progresso da trilha">
+      <div class="progress-heading">
+        <div><p>TRILHA / DIÁRIA_01</p><h2>DESAFIO <span id="challengeIndex">01</span> <em>/</em> <span id="challengeTotal">05</span></h2></div>
+        <span id="trackCategory">CARREGANDO DADOS</span>
+      </div>
+      <div class="progress-track" id="progressBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progressFill"></span></div>
+      <div class="progress-meta"><span id="solvedLabel">0 CONCLUÍDOS</span><span id="xpAvailable">+20 XP DISPONÍVEIS</span></div>
+    </section>
 
-        document.getElementById('btnGerar').addEventListener('click', async () => {
-            const btn = document.getElementById('btnGerar');
-            const areaDesafio = document.getElementById('areaDesafio');
-            const areaResultado = document.getElementById('areaResultado');
+    <article class="challenge-card" id="challengeCard" aria-labelledby="contextTitle">
+      <span class="card-coordinate" aria-hidden="true">X:08.42 / Y:12.07</span>
+      <div class="challenge-body">
+        <div class="challenge-head">
+          <span class="pill" id="categoryTag">ESTATÍSTICA</span>
+          <span class="level" id="difficultyTag">NÍVEL 01 / FÁCIL</span>
+        </div>
+        <p class="challenge-kicker">DESAFIO MATEMÁTICO</p>
+        <h1 class="challenge-title" id="contextTitle">Desafio de matemática</h1>
+        <div class="context-line"><span aria-hidden="true"></span><p id="contextText">DADOS DE FUTEBOL / DADOS EM TEMPO REAL</p></div>
+        <p class="challenge-story" id="challengeStory" hidden></p>
+        <p class="statement" id="statement">Carregando um novo desafio com dados esportivos...</p>
+        <ul class="data-strip" id="dataStrip" hidden></ul>
+        <div class="data-table-wrap" id="dataTableWrap" hidden></div>
+        <div class="system-message" id="systemMessage" role="status" aria-live="polite" hidden></div>
+        <form id="answerForm" novalidate>
+          <fieldset id="answerFieldset">
+            <legend class="visually-hidden">Escolha ou informe sua resposta</legend>
+            <div class="answer-area" id="answerArea"><div class="loading-state"><span class="loader"></span><strong>GERANDO DESAFIO...</strong><small>CONECTANDO AOS DADOS DE FUTEBOL</small></div></div><div class="hint-panel" id="hintPanel" role="note" hidden></div>
+            <p class="field-message" id="fieldMessage" role="alert"></p>
+            <div class="action-row">
+              <button class="hint-button" type="button" id="hintBtn" disabled>DICA <span>?</span></button>
+              <button class="action-button" type="submit" id="checkBtn" disabled><span class="spinner"></span><span id="checkBtnLabel">VALIDAR RESPOSTA</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>
+            </div>
+          </fieldset>
+        </form>
+      </div>
+      <section class="feedback" id="feedback" role="status" aria-live="polite" hidden>
+        <div class="feedback-copy"><span class="feedback-icon" id="feedbackIcon"></span><div><small id="feedbackLabel">CORRETO</small><h2 id="feedbackTitle"></h2><p id="feedbackText"></p></div><strong class="xp-burst" id="xpBurst" hidden>+20 XP</strong></div>
+        <button class="continue-button" type="button" id="nextBtn">CONTINUAR <span>→</span></button>
+      </section>
+    </article>
 
-            btn.disabled = true;
-            btn.innerText = "Consultando API-Football e gerando matemática...";
-            areaDesafio.classList.add('d-none');
-            areaResultado.classList.add('d-none');
+    <section class="summary-card" id="summaryCard" hidden aria-label="Resumo da trilha">
+      <p class="summary-code">SESSÃO_CONCLUÍDA / 05.05</p><span class="summary-symbol" aria-hidden="true">Σ</span><h1>TRILHA<br><span>CONCLUÍDA</span></h1><p>Dados processados. Sua sequência diária foi concluída.</p>
+      <ul class="summary-grid"><li><small>XP GANHOS</small><strong id="sumXp">+0 XP</strong></li><li><small>ACERTOS</small><strong id="sumCorrect">0 / 5</strong></li><li><small>APROVEITAMENTO</small><strong id="sumRate">0%</strong></li><li><small>OFENSIVA</small><strong>🔥 7 DIAS</strong></li></ul>
+      <div class="summary-actions"><button class="action-button" type="button" id="dashboardBtn" hidden> VOLTAR AO PAINEL </button> <button class="secondary-button" type="button" id="restartBtn"> REFAZER TRILHA </button></div>
+    </section>
+  </main>
 
-            try {
-                const resposta = await fetch(`${API_BASE}/desafio`);
-                const dados = await resposta.json();
-
-                if (dados.pergunta) {
-                    idDesafioAtual = dados.idDesafio;
-                    document.getElementById('pergunta').innerText = dados.pergunta;
-                    document.getElementById('dica').innerText = "Dica: " + dados.dica;
-                    document.getElementById('inputResposta').value = '';
-
-                    areaDesafio.classList.remove('d-none');
-                    btn.innerText = "Gerar Novo Desafio";
-                    btn.disabled = false;
-                } else {
-                    alert("Erro da API: " + (dados.erro || "Desconhecido"));
-                    btn.innerText = "Tentar Novamente";
-                    btn.disabled = false;
-                }
-            } catch (error) {
-                console.error(error);
-                alert("Erro de conexão. O servidor Node.js está rodando na porta 3000?");
-                btn.innerText = "Tentar Novamente";
-                btn.disabled = false;
-            }
-        });
-
-        document.getElementById('btnResponder').addEventListener('click', async () => {
-            const input = document.getElementById('inputResposta');
-            const areaResultado = document.getElementById('areaResultado');
-            const btnResponder = document.getElementById('btnResponder');
-
-            if (!idDesafioAtual || input.value === '') {
-                alert("Gere um desafio e digite uma resposta antes de enviar.");
-                return;
-            }
-
-            btnResponder.disabled = true;
-            btnResponder.innerText = "Validando...";
-
-            try {
-                const resp = await fetch(`${API_BASE}/desafio/${idDesafioAtual}/responder`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ resposta: Number(input.value) })
-                });
-                const dados = await resp.json();
-
-                areaResultado.classList.remove('d-none');
-                areaResultado.className = `alert mt-3 ${dados.acertou ? 'alert-success' : 'alert-danger'}`;
-                areaResultado.innerText = dados.mensagem || (dados.erro ?? "Erro ao validar.");
-
-            } catch (error) {
-                console.error(error);
-                alert("Erro de conexão ao validar a resposta.");
-            } finally {
-                btnResponder.disabled = false;
-                btnResponder.innerText = "Responder";
-            }
-        });
-    </script>
+  <footer class="footer"><div class="container-xl footer-inner"><strong>MATH/STATS</strong><span>SISTEMA DE APRENDIZAGEM ORIENTADO POR DADOS</span><nav aria-label="Links do rodapé"><a href="#main">PAINEL</a><a href="#main">TRILHAS</a><a href="#main">PERFIL</a></nav></div></footer>
+  <script src="script.js"></script>
 </body>
 </html>

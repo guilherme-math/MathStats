@@ -1,0 +1,17 @@
+[33mcommit bbd60bc7c524c2a161c5bbe00a0a35a8cd7795c0[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mentrega1409[m[33m, [m[1;31morigin/entrega1409[m[33m)[m
+Author: Guilherme Marins Rodrigues <guilhermemarins74@gmail.com>
+Date:   Sat Sep 12 18:35:55 2026 -0300
+
+    feat: primeira regra de negocio concluida, documentada e estruturada em MVC
+
+ .gitignore                             |    3 [32m+[m
+ README.md                              |   68 [32m+[m
+ package-lock.json                      | 5244 [32m++++++++++++++++++++++++++++++++[m
+ package.json                           |   28 [32m+[m
+ public/index.html                      |  109 [32m+[m
+ src/config/firebase.ts                 |   17 [32m+[m
+ src/controllers/challengeController.ts |  104 [32m+[m
+ src/routes/routes.ts                   |    9 [32m+[m
+ src/server.ts                          |   22 [32m+[m
+ tsconfig.json                          |   12 [32m+[m
+ 10 files changed, 5616 insertions(+)
