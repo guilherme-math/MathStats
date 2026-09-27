@@ -50,6 +50,21 @@ app.get(['/conta', '/conta.html'], requirePageRole('aluno'), (_req, res) => {
   res.sendFile(path.join(process.cwd(), 'protected', 'conta.html'));
 });
 
+app.use(
+  (error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const status =
+      typeof error === 'object' && error !== null && 'status' in error ? Number(error.status) : 503;
+    if (status === 400 || status === 413)
+      return res
+        .status(status)
+        .json({ error: 'O conteúdo enviado é inválido ou excede o limite permitido.' });
+    console.error('[request] Falha ao processar requisição.');
+    return res
+      .status(503)
+      .json({ error: 'Serviço temporariamente indisponível. Tente novamente.' });
+  },
+);
+
 const httpRedirect = express();
 httpRedirect.use((req, res) => {
   res.redirect(`https://${req.hostname}:${HTTPS_PORT}${req.originalUrl}`);

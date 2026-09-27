@@ -1,6 +1,29 @@
 import { Request, Response, NextFunction } from 'express';
 import type { AppSession } from '../types/session';
 import type { UserRole } from '../config/userRoles';
+import { UserModel } from '../models/userModel';
+import { credentialFingerprint } from '../utils/authSession';
+
+export async function validateSession(req: Request, res: Response, next: NextFunction) {
+  const session = req.session as AppSession;
+  if (!session.userId) return next();
+  try {
+    const user = await UserModel.findById(session.userId);
+    if (user && session.credentialFingerprint === credentialFingerprint(user)) {
+      session.role = user.role;
+      return next();
+    }
+    await new Promise<void>((resolve, reject) =>
+      session.destroy((error) => (error ? reject(error) : resolve())),
+    );
+    res.clearCookie(process.env.SESSION_COOKIE_NAME || 'mathstats.sid', { path: '/' });
+    if (req.path.startsWith('/api/'))
+      return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+    return res.redirect('/login');
+  } catch {
+    return res.status(503).json({ error: 'Não foi possível validar sua sessão. Tente novamente.' });
+  }
+}
 
 export function isAuthenticated(req: Request, res: Response, next: NextFunction) {
   if (!(req.session as AppSession).userId) {

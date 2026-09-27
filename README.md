@@ -8,7 +8,8 @@ Plataforma educacional de matemática e estatística contextualizada com dados d
 - Backend em Node.js, Express e TypeScript.
 - Contas, progresso, tentativas e solicitações LGPD no Firebase Firestore.
 - Sessões persistentes no Firebase Firestore e auditoria no MongoDB Atlas.
-- Validação estruturada e limite de requisições nas rotas de desafios.
+- Validação estruturada no cadastro, login, recuperação, troca de senha e desafios.
+- Limites de requisições compartilhados no Firestore.
 - Cache com tolerância a falhas na integração com a API-Football.
 - Senhas com Argon2id; segredo TOTP com AES-256-GCM.
 - 2FA por aplicativo autenticador ou código por e-mail.
@@ -30,6 +31,10 @@ Home ─┬─ Cadastro → configuração do 2FA → login → 2FA → Dashboar
 ```
 
 A página inicial fica em `/` e o acesso em `/login`. Depois do 2FA, o usuário é direcionado para `/dashboard`. Perfil, segurança e direitos LGPD ficam em `/conta`. Sem sessão, `/dashboard`, `/conta`, `/desafio` e as APIs privadas recusam o acesso.
+
+Contas cadastradas com Google entram diretamente após a validação do token do Google. Um cadastro local com o mesmo e-mail não é vinculado automaticamente: nesse caso, o acesso continua por senha ou recuperação. Isso evita herdar credenciais criadas por alguém que informou um e-mail alheio.
+
+A sessão é renovada no login e na conclusão do MFA. A troca de senha invalida as demais sessões e verificações pendentes; a sessão usada para trocar a senha é renovada. Na recuperação, o código é consumido uma única vez e o usuário precisa entrar novamente.
 
 ## Desenvolvimento local
 
@@ -57,6 +62,9 @@ npm start      executa a compilação local
 - `users/{userId}/privacyRequests`: histórico de solicitações de direitos, sem sobrescrever pedidos anteriores.
 - `auditLogs`: eventos de segurança com TTL padrão de 180 dias.
 - `sessions`: sessões persistentes no Firestore com expiração de 15 minutos.
+- `rateLimits`: contadores por rota e resumo criptográfico do IP, com janelas de 15 minutos.
+
+Ative políticas TTL no Firestore para o campo `expiresAt` dos grupos de coleções `sessions` e `rateLimits`. O backend verifica o vencimento antes de usar esses registros, independentemente do tempo da limpeza física do provedor. Sem a política, documentos vencidos podem permanecer armazenados.
 
 Novos cadastros registram as versões dos Termos e da Política definidas em `src/config/legalDocuments.ts`. Contas antigas permanecem identificadas como aceite legado sem versão.
 
@@ -66,7 +74,7 @@ O nome de exibição e o username são validados no navegador e novamente no bac
 
 ## Publicação na Vercel
 
-O arquivo `src/server.ts` exporta a aplicação Express para a Vercel e inicia HTTPS somente no desenvolvimento local. Os arquivos em `public/` são entregues pela CDN; as páginas em `protected/` continuam passando pela verificação de sessão.
+O arquivo `src/server.ts` exporta a aplicação Express para a Vercel. Quando executado diretamente fora da Vercel, inicia o servidor HTTPS local. Os arquivos em `public/` são entregues pela CDN; as páginas em `protected/` continuam passando pela verificação de sessão.
 
 Configure estas variáveis em **Project → Settings → Environment Variables**:
 
@@ -91,6 +99,23 @@ APP_TIMEZONE=America/Sao_Paulo
 `FIREBASE_SERVICE_ACCOUNT_BASE64` deve conter o arquivo JSON da conta de serviço codificado em Base64. No desenvolvimento local, `FIREBASE_KEY_PATH` pode apontar para `firebase-key.json`. Não envie credenciais, arquivos `.env`, certificados ou chaves ao repositório.
 
 Depois da primeira publicação, adicione a URL final da Vercel às origens autorizadas do cliente OAuth no Google Cloud. Configure `APP_BASE_URL` e `ALLOWED_ORIGIN` com o mesmo domínio da aplicação.
+
+A conta de serviço deve poder ler e gravar `users`, `challenges`, `sessions` e `rateLimits`. Os limites usam transações no Firestore e recusam a operação quando esse armazenamento está indisponível. Cada requisição privada verifica se a conta existe e se as credenciais ainda correspondem à sessão.
+
+Depois desta atualização, sessões antigas precisam de um novo login. Cadastros antigos sem os campos normalizados ainda podem ser encontrados pelo valor exato de usuário ou e-mail; o servidor não percorre toda a coleção para procurar uma conta.
+
+## Organização do backend
+
+- `controllers`: requisições e respostas HTTP; autenticação, dashboard, desafios e privacidade em módulos separados.
+- `services/challengeBuilder.ts`: cálculos e conteúdo das cinco atividades, sem acesso à rede ou ao banco.
+- `services/footballService.ts`: consulta, validação e cache dos dados esportivos.
+- `validation`: contratos de entrada das APIs.
+- `models`: consultas e alterações dos dados.
+- `stores`: persistência de sessões e limites compartilhados.
+
+Os testes usam substitutos locais para os serviços externos. Eles verificam os fluxos de autenticação e recuperação, isolamento, cálculos e tratamento de falhas, mas não comprovam a configuração dos provedores em produção.
+
+As substituições de `uuid` em `package.json` mantêm a versão corrigida `11.1.1` nos clientes Google que usam `v4()`, preservando a compatibilidade CommonJS do projeto. Reavalie essas substituições ao atualizar o Firebase e os clientes Google.
 
 ## Documentação LGPD
 

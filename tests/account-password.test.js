@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 process.env.NODE_ENV = 'test';
+process.env.SESSION_SECRET = 'test-session-secret';
 process.env.ENCRYPTION_KEY = '0'.repeat(64);
 const argon2 = require('argon2');
 const { UserModel } = require('../dist/models/userModel');
@@ -44,7 +45,13 @@ test('titular troca a própria senha ao confirmar a senha atual', async () => {
     const response = responseRecorder();
     await AuthController.setPassword(
       {
-        session: { userId: 'user-1' },
+        session: {
+          userId: 'user-1',
+          regenerate(done) {
+            for (const key of Object.keys(this)) if (key !== 'regenerate') delete this[key];
+            done();
+          },
+        },
         body: { currentPassword: 'Senha@2025', password: 'Nova@2026' },
         ip: '127.0.0.1',
         socket: {},
@@ -78,7 +85,13 @@ test('troca de senha recusa a senha atual incorreta', async () => {
     const response = responseRecorder();
     await AuthController.setPassword(
       {
-        session: { userId: 'user-1' },
+        session: {
+          userId: 'user-1',
+          regenerate(done) {
+            for (const key of Object.keys(this)) if (key !== 'regenerate') delete this[key];
+            done();
+          },
+        },
         body: { currentPassword: 'Errada@2025', password: 'Nova@2026' },
         ip: '127.0.0.1',
         socket: {},

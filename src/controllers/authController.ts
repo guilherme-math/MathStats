@@ -9,43 +9,23 @@ import { encryptAES, decryptAES } from '../utils/crypto';
 import { sendWelcomeEmail, sendMfaCodeEmail } from '../utils/mailer';
 import { audit } from '../utils/auditLogger';
 import type { AppSession } from '../types/session';
-import { getEffectiveStreak, getStudyDateKey, previousStudyDateKey } from '../utils/streak';
 import { validatePublicIdentity } from '../utils/contentFilter';
 import { LEGAL_DOCUMENTS } from '../config/legalDocuments';
 import { isTrustedDevice, rememberTrustedDevice } from '../utils/trustedDevice';
 import { isPasswordValid, PASSWORD_POLICY_MESSAGE } from '../utils/passwordPolicy';
+import {
+  authenticateSession,
+  credentialFingerprint,
+  hasCurrentMfa,
+  renewSession,
+} from '../utils/authSession';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
-const s = (req: Request) => req.session as AppSession;
+const getSession = (req: Request) => req.session as AppSession;
 
 function getIp(req: Request): string {
   return req.ip ?? req.socket?.remoteAddress ?? 'unknown';
-}
-
-function serializeDate(value: any): string | null {
-  if (!value) return null;
-  if (typeof value.toDate === 'function') return value.toDate().toISOString();
-  if (value instanceof Date) return value.toISOString();
-  return String(value);
-}
-
-function toJsDate(value: any): Date | null {
-  if (!value) return null;
-  if (typeof value.toDate === 'function') return value.toDate();
-  if (value instanceof Date) return value;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function formatDayLabel(dateKey: string) {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  const weekday = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', timeZone: 'UTC' })
-    .format(date)
-    .replace('.', '')
-    .toUpperCase();
-  return { weekday, day: `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}` };
 }
 
 function hashCode(code: string): string {
@@ -216,12 +196,7 @@ export const AuthController = {
       });
 
       if (isTrustedDevice(req, user.id, user.passwordHash)) {
-        s(req).userId = user.id;
-        s(req).username = user.username;
-        s(req).role = user.role;
-        s(req).pending2faUserId = undefined;
-        s(req).mfaEmailCodeHash = undefined;
-        s(req).mfaEmailExpires = undefined;
+        await authenticateSession(req, user);
         await audit({
           event: 'LOGIN_2FA_SUCCESS',
           userId: user.id,
@@ -236,7 +211,10 @@ export const AuthController = {
         });
       }
 
-      s(req).pending2faUserId = user.id;
+      const pendingSession = await renewSession(req);
+      pendingSession.pending2faUserId = user.id;
+      pendingSession.pendingCredentialFingerprint = credentialFingerprint(user);
+      pendingSession.pending2faExpires = Date.now() + 15 * 60 * 1000;
       return res.json({
         message: 'Senha validada. Informe o código de verificação.',
         require2FA: true,
@@ -250,17 +228,20 @@ export const AuthController = {
   },
 
   async sendMfaEmail(req: Request, res: Response) {
-    const userId = s(req).pending2faUserId;
+    const userId = getSession(req).pending2faUserId;
     if (!userId) return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
 
     try {
       const user = await UserModel.findById(userId);
       if (!user?.email) return res.status(400).json({ error: 'E-mail da conta não encontrado.' });
+      if (!hasCurrentMfa(getSession(req), user))
+        return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
 
-      const code = (crypto.randomBytes(4).readUInt32BE(0) % 1_000_000).toString().padStart(6, '0');
+      const code = crypto.randomInt(1_000_000).toString().padStart(6, '0');
       await sendMfaCodeEmail(user.email, user.username, code);
-      s(req).mfaEmailCodeHash = hashCode(code);
-      s(req).mfaEmailExpires = Date.now() + 15 * 60 * 1000;
+      getSession(req).mfaEmailCodeHash = hashCode(code);
+      getSession(req).mfaEmailExpires = Date.now() + 15 * 60 * 1000;
+      getSession(req).mfaEmailUserId = user.id;
 
       return res.json({
         message: 'Código enviado para o e-mail cadastrado. Válido por 15 minutos.',
@@ -275,7 +256,7 @@ export const AuthController = {
 
   async verifyToken(req: Request, res: Response) {
     const { token, method, rememberDevice } = req.body;
-    const session = s(req);
+    const session = getSession(req);
     const pendingId = session.pending2faUserId;
 
     if (!pendingId)
@@ -286,12 +267,14 @@ export const AuthController = {
     try {
       const user = await UserModel.findById(pendingId);
       if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
+      if (!hasCurrentMfa(session, user))
+        return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
 
       if (method === 'email') {
         const codeHash = session.mfaEmailCodeHash;
         const expires = session.mfaEmailExpires;
 
-        if (!codeHash || !expires)
+        if (!codeHash || !expires || session.mfaEmailUserId !== pendingId)
           return res.status(400).json({ error: 'Solicite um código por e-mail antes de validar.' });
         if (Date.now() > expires)
           return res.status(401).json({ error: 'Código expirado. Solicite um novo código.' });
@@ -340,10 +323,7 @@ export const AuthController = {
         }
       }
 
-      session.userId = pendingId;
-      session.username = user.username;
-      session.role = user.role;
-      session.pending2faUserId = undefined;
+      await authenticateSession(req, user);
 
       if (rememberDevice === true && user.passwordHash) {
         rememberTrustedDevice(req, res, user.id, user.passwordHash);
@@ -409,14 +389,9 @@ export const AuthController = {
             .json({ error: 'Este e-mail já está vinculado a outra identidade Google.' });
         }
         if (!user.googleId) {
-          await UserModel.linkGoogleId(user.id, googleId);
-          user.googleId = googleId;
-          await audit({
-            event: 'GOOGLE_LINKED',
-            userId: user.id,
-            username: user.username,
-            ip: getIp(req),
-            detail: 'Conta Google vinculada por e-mail verificado',
+          return res.status(409).json({
+            error:
+              'Este e-mail possui cadastro com senha. Entre com usuário e senha ou recupere o acesso. A vinculação automática com Google não está disponível.',
           });
         }
         await audit({
@@ -426,10 +401,7 @@ export const AuthController = {
           ip: getIp(req),
           detail: 'Login concluído via conta Google com e-mail verificado',
         });
-        s(req).userId = user.id;
-        s(req).username = user.username;
-        s(req).role = user.role;
-        s(req).pending2faUserId = undefined;
+        await authenticateSession(req, user);
         return res.json({
           authenticated: true,
           linkedExistingAccount: !byGoogleId && Boolean(byEmail),
@@ -503,10 +475,7 @@ export const AuthController = {
         detail: 'Conta criada via Google com aceite dos documentos legais',
       });
 
-      s(req).userId = user.id;
-      s(req).username = user.username;
-      s(req).role = user.role;
-      s(req).pending2faUserId = undefined;
+      await authenticateSession(req, user);
 
       return res.status(201).json({
         created: true,
@@ -520,7 +489,7 @@ export const AuthController = {
   },
 
   async setPassword(req: Request, res: Response) {
-    const userId = s(req).userId;
+    const userId = getSession(req).userId;
     const { currentPassword, password } = req.body;
 
     if (!userId) return res.status(401).json({ error: 'Acesso negado.' });
@@ -538,7 +507,9 @@ export const AuthController = {
         return res.status(401).json({ error: 'A senha atual está incorreta.' });
       }
 
-      await UserModel.updatePassword(user.id, await hashPassword(password));
+      const passwordHash = await hashPassword(password);
+      await UserModel.updatePassword(user.id, passwordHash, user.passwordHash);
+      await authenticateSession(req, { ...user, passwordHash });
       await audit({
         event: changingPassword ? 'PASSWORD_CHANGED' : 'PASSWORD_CREATED',
         userId: user.id,
@@ -559,118 +530,8 @@ export const AuthController = {
     }
   },
 
-  async dashboard(req: Request, res: Response) {
-    try {
-      const userId = s(req).userId!;
-      const user = await UserModel.findById(userId);
-      if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
-
-      const challengeHistory = await UserModel.getChallengeHistory(userId, 500);
-      const recentChallenges = challengeHistory.slice(0, 10);
-      const challengesAnswered = Number(user.challengesAnswered) || 0;
-      const challengesCorrect = Number(user.challengesCorrect) || 0;
-      const accuracy =
-        challengesAnswered > 0 ? Math.round((challengesCorrect / challengesAnswered) * 100) : 0;
-
-      const today = getStudyDateKey();
-      const activityKeys = [today];
-      for (let i = 1; i < 7; i += 1) activityKeys.unshift(previousStudyDateKey(activityKeys[0]));
-
-      const activityMap = new Map(
-        activityKeys.map((key) => [key, { answered: 0, correct: 0, xp: 0 }]),
-      );
-      const categoryMap = new Map<string, { answered: number; correct: number; xp: number }>();
-
-      for (const attempt of challengeHistory) {
-        const attemptDate = toJsDate(attempt.respondidoEm);
-        if (attemptDate) {
-          const key = getStudyDateKey(attemptDate);
-          const activity = activityMap.get(key);
-          if (activity) {
-            activity.answered += 1;
-            if (attempt.acertou) activity.correct += 1;
-            activity.xp += Number(attempt.xpGanho) || 0;
-          }
-        }
-
-        const categoryName = String(attempt.categoria || 'Matemática');
-        const category = categoryMap.get(categoryName) || { answered: 0, correct: 0, xp: 0 };
-        category.answered += 1;
-        if (attempt.acertou) category.correct += 1;
-        category.xp += Number(attempt.xpGanho) || 0;
-        categoryMap.set(categoryName, category);
-      }
-
-      const activity7Days = activityKeys.map((key) => {
-        const data = activityMap.get(key)!;
-        const labels = formatDayLabel(key);
-        return { date: key, ...labels, ...data };
-      });
-
-      const attemptsLast7Days = activity7Days.reduce((sum, item) => sum + item.answered, 0);
-      const correctLast7Days = activity7Days.reduce((sum, item) => sum + item.correct, 0);
-      const xpLast7Days = activity7Days.reduce((sum, item) => sum + item.xp, 0);
-      const accuracyLast7Days =
-        attemptsLast7Days > 0 ? Math.round((correctLast7Days / attemptsLast7Days) * 100) : 0;
-
-      const categoryPerformance = Array.from(categoryMap.entries())
-        .map(([name, stats]) => ({
-          name,
-          answered: stats.answered,
-          correct: stats.correct,
-          xp: stats.xp,
-          accuracy: stats.answered > 0 ? Math.round((stats.correct / stats.answered) * 100) : 0,
-        }))
-        .sort((a, b) => b.answered - a.answered || b.accuracy - a.accuracy)
-        .slice(0, 6);
-
-      return res.json({
-        message: 'Sessão autenticada.',
-        user: {
-          id: user.id,
-          displayName: user.displayName || user.username,
-          username: user.username,
-          email: user.email,
-          xpTotal: Number(user.xpTotal) || 0,
-          streak: getEffectiveStreak(Number(user.streak) || 0, user.lastStudyDate || null),
-          lastStudyDate: user.lastStudyDate || null,
-          challengesAnswered,
-          challengesCorrect,
-          challengesIncorrect: Math.max(challengesAnswered - challengesCorrect, 0),
-          accuracy,
-          recentChallenges: recentChallenges.map((attempt) => ({
-            id: attempt.id,
-            challengeId: attempt.challengeId,
-            tipoDesafio: attempt.tipoDesafio,
-            categoria: attempt.categoria,
-            dificuldade: attempt.dificuldade,
-            titulo: attempt.titulo,
-            acertou: attempt.acertou,
-            usouDica: attempt.usouDica,
-            xpGanho: Number(attempt.xpGanho) || 0,
-            respondidoEm: serializeDate(attempt.respondidoEm),
-          })),
-          hasPassword: Boolean(user.passwordHash),
-          googleLinked: Boolean(user.googleId),
-        },
-        dashboard: {
-          attemptsLast7Days,
-          correctLast7Days,
-          accuracyLast7Days,
-          xpLast7Days,
-          activity7Days,
-          categoryPerformance,
-          historyAnalyzed: challengeHistory.length,
-        },
-      });
-    } catch (error) {
-      console.error('[dashboard]', error);
-      return res.status(500).json({ error: 'Não foi possível carregar os dados da sessão.' });
-    }
-  },
-
   logout(req: Request, res: Response) {
-    const session = s(req);
+    const session = getSession(req);
     const userId = session.userId;
     const username = session.username;
     audit({

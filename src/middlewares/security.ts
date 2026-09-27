@@ -5,6 +5,8 @@ import helmet from 'helmet';
 import cors from 'cors';
 import path from 'path';
 import { FirestoreSessionStore } from '../stores/firestoreSessionStore';
+import { validateSession } from './auth';
+import { FirestoreRateLimitStore } from '../stores/firestoreRateLimitStore';
 
 const REQUIRED_ENVIRONMENT_VARIABLES = [
   'SESSION_SECRET',
@@ -70,9 +72,11 @@ export function applySecurityMiddlewares(app: express.Application) {
       },
     }),
   );
+  app.use(validateSession);
 }
 
 export const loginLimiter = rateLimit({
+  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('login'),
   windowMs: 15 * 60 * 1000,
   max: 5,
   standardHeaders: true,
@@ -81,6 +85,7 @@ export const loginLimiter = rateLimit({
 });
 
 export const mfaLimiter = rateLimit({
+  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('mfa'),
   windowMs: 15 * 60 * 1000,
   max: 8,
   standardHeaders: true,
@@ -91,6 +96,7 @@ export const mfaLimiter = rateLimit({
 });
 
 export const mfaEmailSendLimiter = rateLimit({
+  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('mfa-email'),
   windowMs: 15 * 60 * 1000,
   max: 3,
   standardHeaders: true,
@@ -99,6 +105,7 @@ export const mfaEmailSendLimiter = rateLimit({
 });
 
 export const recoveryLimiter = rateLimit({
+  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('recovery'),
   windowMs: 15 * 60 * 1000,
   max: 4,
   standardHeaders: true,
@@ -107,6 +114,7 @@ export const recoveryLimiter = rateLimit({
 });
 
 export const googleAuthLimiter = rateLimit({
+  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('google'),
   windowMs: 15 * 60 * 1000,
   max: 10,
   standardHeaders: true,
@@ -115,6 +123,7 @@ export const googleAuthLimiter = rateLimit({
 });
 
 export const lgpdLimiter = rateLimit({
+  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('lgpd'),
   windowMs: 15 * 60 * 1000,
   max: 20,
   standardHeaders: true,
@@ -123,6 +132,8 @@ export const lgpdLimiter = rateLimit({
 });
 
 export const challengeGenerationLimiter = rateLimit({
+  store:
+    process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('challenge-create'),
   windowMs: 15 * 60 * 1000,
   max: 20,
   standardHeaders: true,
@@ -131,9 +142,29 @@ export const challengeGenerationLimiter = rateLimit({
 });
 
 export const challengeAnswerLimiter = rateLimit({
+  store:
+    process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('challenge-answer'),
   windowMs: 15 * 60 * 1000,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: { erro: 'Limite de respostas atingido. Aguarde 15 minutos.' },
+});
+
+export const signupLimiter = rateLimit({
+  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('signup'),
+  windowMs: 15 * 60 * 1000,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Limite de cadastros atingido. Aguarde 15 minutos.' },
+});
+
+export const passwordChangeLimiter = rateLimit({
+  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('password'),
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas de alteração de senha. Aguarde 15 minutos.' },
 });

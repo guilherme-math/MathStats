@@ -10,8 +10,8 @@ const fixtureSchema = z.object({
     away: z.object({ id: z.number(), name: z.string() }),
   }),
   goals: z.object({
-    home: z.number().nullable(),
-    away: z.number().nullable(),
+    home: z.number().int().nonnegative().nullable(),
+    away: z.number().int().nonnegative().nullable(),
   }),
 });
 
@@ -37,6 +37,7 @@ const CACHE_STALE_MS = 24 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 5_000;
 
 const cacheByQuery = new Map<string, CacheEntry>();
+const requestsByQuery = new Map<string, Promise<Fixture[]>>();
 
 function isRetryable(error: unknown): boolean {
   if (!axios.isAxiosError(error)) return false;
@@ -52,8 +53,12 @@ async function fetchFixtures(teamId: number, season: number): Promise<Fixture[]>
         params: { team: teamId, season },
         headers: { 'x-apisports-key': process.env.API_FOOTBALL_KEY },
         timeout: REQUEST_TIMEOUT_MS,
+        maxContentLength: 2 * 1024 * 1024,
       });
-      return fixturesResponseSchema.parse(response.data).response;
+      const fixtures = fixturesResponseSchema.parse(response.data).response;
+      if (normalizeRecentMatches(fixtures, teamId).length < 5)
+        throw new Error('A API não retornou cinco partidas finalizadas válidas.');
+      return fixtures;
     } catch (error) {
       lastError = error;
       if (!isRetryable(error)) break;
@@ -65,7 +70,13 @@ async function fetchFixtures(teamId: number, season: number): Promise<Fixture[]>
 
 export function normalizeRecentMatches(fixtures: Fixture[], teamId: number): TeamMatch[] {
   return fixtures
-    .filter((fixture) => fixture.fixture.status.short === 'FT')
+    .filter(
+      (fixture) =>
+        fixture.fixture.status.short === 'FT' &&
+        (fixture.teams.home.id === teamId || fixture.teams.away.id === teamId) &&
+        fixture.goals.home !== null &&
+        fixture.goals.away !== null,
+    )
     .slice(-5)
     .map((fixture) => {
       const homeTeam = fixture.teams.home.id === teamId;
@@ -87,17 +98,21 @@ export async function getRecentTeamMatches(teamId: number, season: number): Prom
   }
 
   try {
-    const fixtures = await fetchFixtures(teamId, season);
+    let pending = requestsByQuery.get(cacheKey);
+    if (!pending) {
+      pending = fetchFixtures(teamId, season).finally(() => requestsByQuery.delete(cacheKey));
+      requestsByQuery.set(cacheKey, pending);
+    }
+    const fixtures = await pending;
     cacheByQuery.set(cacheKey, { fixtures, fetchedAt: now });
     return normalizeRecentMatches(fixtures, teamId);
-  } catch (error) {
+  } catch {
     if (cache && now - cache.fetchedAt < CACHE_STALE_MS) {
       console.warn('[api-football] Serviço indisponível. Usando dados recentes em cache.');
       return normalizeRecentMatches(cache.fixtures, teamId);
     }
     throw Object.assign(new Error('Os dados esportivos estão indisponíveis no momento.'), {
       statusCode: 503,
-      cause: error,
     });
   }
 }

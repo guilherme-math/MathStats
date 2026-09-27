@@ -10,7 +10,7 @@ import { sendPrivacyRequestNotification } from '../utils/mailer';
 import { validatePublicIdentity } from '../utils/contentFilter';
 import type { AppSession } from '../types/session';
 
-const s = (req: Request) => req.session as AppSession;
+const getSession = (req: Request) => req.session as AppSession;
 
 function getIp(req: Request): string {
   return req.ip ?? req.socket?.remoteAddress ?? 'unknown';
@@ -40,7 +40,7 @@ async function safeGetLogs(userId: string, limit: number) {
 
 export const LgpdController = {
   async getData(req: Request, res: Response) {
-    const userId = s(req).userId!;
+    const userId = getSession(req).userId!;
     try {
       const user = await UserModel.findById(userId);
       if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -125,16 +125,13 @@ export const LgpdController = {
   },
 
   async exportData(req: Request, res: Response) {
-    const userId = s(req).userId!;
+    const userId = getSession(req).userId!;
     try {
       const user = await UserModel.findById(userId);
       if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
       const [logs, challengeHistory, privacyRequests] = await Promise.all([
-        getAllAuditLogsForUser(userId).catch((error) => {
-          console.error('[lgpd] Falha ao exportar logs:', error);
-          return [];
-        }),
+        getAllAuditLogsForUser(userId),
         UserModel.getAllChallengeHistory(userId),
         UserModel.getPrivacyRequests(userId),
       ]);
@@ -209,7 +206,7 @@ export const LgpdController = {
   },
 
   async correctProfile(req: Request, res: Response) {
-    const userId = s(req).userId!;
+    const userId = getSession(req).userId!;
     const { displayName } = req.body;
     if (!validDisplayName(displayName))
       return res
@@ -237,7 +234,7 @@ export const LgpdController = {
   },
 
   async requestDataRight(req: Request, res: Response) {
-    const userId = s(req).userId!;
+    const userId = getSession(req).userId!;
     const { type, detail } = req.body;
     if (!RIGHTS_REQUEST_TYPES.has(type))
       return res.status(400).json({ error: 'Tipo de solicitação inválido.' });
@@ -275,7 +272,7 @@ export const LgpdController = {
   },
 
   async getPrivacyRequests(req: Request, res: Response) {
-    const userId = s(req).userId!;
+    const userId = getSession(req).userId!;
     try {
       const requests = await UserModel.getPrivacyRequests(userId);
       return res.json({
@@ -295,7 +292,7 @@ export const LgpdController = {
   },
 
   async deleteAccount(req: Request, res: Response) {
-    const userId = s(req).userId!;
+    const userId = getSession(req).userId!;
     try {
       const user = await UserModel.findById(userId);
       if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -324,7 +321,7 @@ export const LgpdController = {
   },
 
   async getMyAuditLogs(req: Request, res: Response) {
-    const userId = s(req).userId!;
+    const userId = getSession(req).userId!;
     try {
       const logs = await safeGetLogs(userId, 50);
       return res.json({

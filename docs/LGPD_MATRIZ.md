@@ -4,19 +4,22 @@ Este documento resume quais dados o MathStats utiliza, por que são necessários
 
 ## Dados utilizados
 
-| Dado                                | Finalidade                           | Armazenamento                         | Retenção                             |
-| ----------------------------------- | ------------------------------------ | ------------------------------------- | ------------------------------------ |
-| Nome de exibição, usuário e e-mail  | Criar e identificar a conta          | Firebase Firestore                    | Enquanto a conta estiver ativa       |
-| Hash da senha                       | Autenticação local                   | Firebase Firestore                    | Enquanto a senha estiver configurada |
-| Identificador Google                | Permitir login com Google            | Firebase Firestore                    | Enquanto a conta estiver vinculada   |
-| Segredo do autenticador             | Segundo fator de acesso              | Firebase Firestore, com AES-256-GCM   | Enquanto a conta estiver ativa       |
-| Códigos temporários                 | Login e recuperação                  | Sessão e hash temporário              | Até 15 minutos ou primeiro uso       |
-| XP, ofensiva, respostas e histórico | Exibir o progresso educacional       | Firebase Firestore                    | Enquanto a conta estiver ativa       |
-| Sessão autenticada                  | Manter o acesso                      | Firebase Firestore e cookie essencial | Até 15 minutos sem renovação         |
-| Eventos de auditoria                | Segurança e rastreabilidade          | MongoDB Atlas                         | 180 dias                             |
-| Aceite dos documentos               | Registrar os documentos apresentados | Firebase Firestore                    | Enquanto a conta estiver ativa       |
+| Dado                                    | Finalidade                           | Armazenamento                         | Retenção                                            |
+| --------------------------------------- | ------------------------------------ | ------------------------------------- | --------------------------------------------------- |
+| Nome de exibição, usuário e e-mail      | Criar e identificar a conta          | Firebase Firestore                    | Enquanto a conta estiver ativa                      |
+| Hash da senha                           | Autenticação local                   | Firebase Firestore                    | Enquanto a senha estiver configurada                |
+| Identificador Google                    | Permitir login com Google            | Firebase Firestore                    | Enquanto a conta estiver vinculada                  |
+| Segredo do autenticador                 | Segundo fator de acesso              | Firebase Firestore, com AES-256-GCM   | Enquanto a conta estiver ativa                      |
+| Códigos temporários                     | Login e recuperação                  | Sessão e hash temporário              | Até 15 minutos ou primeiro uso                      |
+| XP, ofensiva, respostas e histórico     | Exibir o progresso educacional       | Firebase Firestore                    | Enquanto a conta estiver ativa                      |
+| Sessão autenticada                      | Manter o acesso                      | Firebase Firestore e cookie essencial | Até 15 minutos sem renovação                        |
+| Contadores e resumo criptográfico do IP | Limitar abuso por rota               | Firestore, coleção `rateLimits`       | Janela lógica de 15 minutos; limpeza física via TTL |
+| Eventos de auditoria                    | Segurança e rastreabilidade          | MongoDB Atlas                         | 180 dias                                            |
+| Aceite dos documentos                   | Registrar os documentos apresentados | Firebase Firestore                    | Enquanto a conta estiver ativa                      |
 
 O MathStats não solicita CPF, endereço residencial, localização precisa, imagem, voz, biometria, dados financeiros, informações de saúde ou data de nascimento completa.
+
+As coleções `sessions` e `rateLimits` dependem da política TTL em `expiresAt` para limpeza física dos registros vencidos. A aplicação rejeita sessões vencidas e reinicia contadores vencidos mesmo antes da exclusão pelo provedor. O resumo do IP é um identificador pseudonimizado, não uma garantia de anonimização.
 
 ## Serviços externos
 

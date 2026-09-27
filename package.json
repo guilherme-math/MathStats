@@ -33,6 +33,17 @@
     "speakeasy": "^2.0.0",
     "zod": "^4.6.5"
   },
+  "overrides": {
+    "gaxios": {
+      "uuid": "11.1.1"
+    },
+    "google-gax": {
+      "uuid": "11.1.1"
+    },
+    "teeny-request": {
+      "uuid": "11.1.1"
+    }
+  },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

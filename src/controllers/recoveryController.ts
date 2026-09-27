@@ -7,12 +7,13 @@ import { audit } from '../utils/auditLogger';
 import { isPasswordValid, PASSWORD_POLICY_MESSAGE } from '../utils/passwordPolicy';
 import type { AppSession } from '../types/session';
 import type { Timestamp } from 'firebase-admin/firestore';
+import { credentialFingerprint, renewSession } from '../utils/authSession';
 
 function getIp(req: Request): string {
   return req.ip ?? req.socket?.remoteAddress ?? 'unknown';
 }
 
-const s = (req: Request) => req.session as AppSession;
+const getSession = (req: Request) => req.session as AppSession;
 
 function toJsDate(val: Timestamp | Date | undefined): Date {
   if (!val) return new Date(0);
@@ -20,7 +21,7 @@ function toJsDate(val: Timestamp | Date | undefined): Date {
 }
 
 function generateOtpCode(): string {
-  const num = crypto.randomBytes(4).readUInt32BE(0) % 1_000_000;
+  const num = crypto.randomInt(1_000_000);
   return num.toString().padStart(6, '0');
 }
 
@@ -39,6 +40,7 @@ export const RecoveryController = {
     }
 
     try {
+      await renewSession(req);
       const user = await UserModel.findByUsername(username.trim());
 
       if (!user || !user.email) {
@@ -54,12 +56,12 @@ export const RecoveryController = {
 
       await UserModel.updateRecoveryToken(user.id, hashCode(code), expires);
 
-      s(req).pendingRecoveryUserId = user.id;
-      s(req).recoveryVerified = false;
+      getSession(req).pendingRecoveryUserId = user.id;
+      getSession(req).recoveryVerified = false;
+      getSession(req).recoveryExpires = expires.getTime();
+      getSession(req).recoveryCredentialFingerprint = credentialFingerprint(user);
 
-      void sendRecoveryCodeEmail(user.email, user.username, code).catch((err) =>
-        console.error('[mailer] Falha ao enviar e-mail de recuperação:', err),
-      );
+      await sendRecoveryCodeEmail(user.email, user.username, code);
 
       await audit({
         event: 'RECOVERY_REQUESTED',
@@ -70,7 +72,8 @@ export const RecoveryController = {
       });
 
       return res.status(200).json({
-        message: 'Código de recuperação enviado para o e-mail cadastrado. Válido por 15 minutos.',
+        message:
+          'Se o usuário existir, um código de recuperação será enviado para o e-mail cadastrado.',
       });
     } catch (err) {
       console.error('[recover/start]', err);
@@ -82,7 +85,7 @@ export const RecoveryController = {
 
   async verify(req: Request, res: Response) {
     const { token } = req.body;
-    const userId = s(req).pendingRecoveryUserId;
+    const userId = getSession(req).pendingRecoveryUserId;
 
     if (!userId) {
       return res
@@ -130,8 +133,11 @@ export const RecoveryController = {
           .json({ error: 'Código incorreto. Verifique o e-mail e tente novamente.' });
       }
 
-      await UserModel.updateRecoveryToken(user.id, '', new Date(0));
-      s(req).recoveryVerified = true;
+      if (!(await UserModel.consumeRecoveryToken(user.id, hashCode(token.trim()))))
+        return res
+          .status(401)
+          .json({ error: 'Código já utilizado ou expirado. Solicite um novo.' });
+      getSession(req).recoveryVerified = true;
 
       await audit({
         event: 'RECOVERY_VERIFIED',
@@ -152,11 +158,11 @@ export const RecoveryController = {
 
   async reset(req: Request, res: Response) {
     const { password } = req.body;
-    const session = s(req);
+    const session = getSession(req);
     const userId = session.pendingRecoveryUserId;
     const verified = session.recoveryVerified;
 
-    if (!userId || !verified) {
+    if (!userId || !verified || !session.recoveryExpires || session.recoveryExpires <= Date.now()) {
       return res
         .status(401)
         .json({ error: 'Sessão inválida. Reinicie o processo de recuperação de senha.' });
@@ -168,12 +174,13 @@ export const RecoveryController = {
     try {
       const user = await UserModel.findById(userId);
       if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
+      if (session.recoveryCredentialFingerprint !== credentialFingerprint(user))
+        return res.status(401).json({ error: 'Sessão expirada. Reinicie a recuperação.' });
 
       const newPasswordHash = await argon2.hash(password, { type: argon2.argon2id });
-      await UserModel.updatePassword(userId, newPasswordHash);
+      await UserModel.updatePassword(userId, newPasswordHash, user.passwordHash);
 
-      session.pendingRecoveryUserId = undefined;
-      session.recoveryVerified = undefined;
+      await renewSession(req);
 
       await audit({
         event: 'RECOVERY_SUCCESS',

@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.NODE_ENV = 'test';
+process.env.SESSION_SECRET = 'test-session-secret';
 process.env.GOOGLE_CLIENT_ID = 'google-client-test';
 process.env.ENCRYPTION_KEY = '0'.repeat(64);
 
@@ -50,6 +51,10 @@ test('login com Google verificado conclui a sessão sem exigir 2FA adicional', a
     session: { pending2faUserId: 'old-pending-user' },
     ip: '127.0.0.1',
     socket: {},
+  };
+  request.session.regenerate = (done) => {
+    request.session = {};
+    done();
   };
   const response = responseMock();
 

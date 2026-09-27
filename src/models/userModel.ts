@@ -107,20 +107,8 @@ async function normalizeStoredUser(doc: DocumentSnapshot): Promise<User> {
 }
 
 async function legacyFind(field: 'username' | 'email', value: string): Promise<User | null> {
-  const snapshot = await usersCollection.get();
-  const wanted = field === 'username' ? normalizeUsername(value) : normalizeEmail(value);
-
-  for (const doc of snapshot.docs) {
-    const data = doc.data() as any;
-    const current =
-      field === 'username'
-        ? normalizeUsername(String(data.username || ''))
-        : normalizeEmail(String(data.email || ''));
-
-    if (current === wanted) return normalizeStoredUser(doc);
-  }
-
-  return null;
+  const snapshot = await usersCollection.where(field, '==', value.trim()).limit(1).get();
+  return snapshot.empty ? null : normalizeStoredUser(snapshot.docs[0]);
 }
 
 export const UserModel = {
@@ -220,11 +208,41 @@ export const UserModel = {
     await usersCollection.doc(id).update({ recoveryToken, recoveryTokenExpires });
   },
 
-  updatePassword: async (id: string, passwordHash: string): Promise<void> => {
-    await usersCollection.doc(id).update({
-      passwordHash,
-      recoveryToken: null,
-      recoveryTokenExpires: null,
+  consumeRecoveryToken: async (id: string, tokenHash: string): Promise<boolean> => {
+    const reference = usersCollection.doc(id);
+    return db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(reference);
+      const user = snapshot.data();
+      if (
+        !user ||
+        user.recoveryToken !== tokenHash ||
+        !user.recoveryTokenExpires ||
+        user.recoveryTokenExpires.toMillis() <= Date.now()
+      )
+        return false;
+      transaction.update(reference, { recoveryToken: null, recoveryTokenExpires: null });
+      return true;
+    });
+  },
+
+  updatePassword: async (
+    id: string,
+    passwordHash: string,
+    previousHash?: string,
+  ): Promise<void> => {
+    const reference = usersCollection.doc(id);
+    await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(reference);
+      if (
+        !snapshot.exists ||
+        (previousHash !== undefined && snapshot.data()?.passwordHash !== previousHash)
+      )
+        throw new Error('As credenciais foram alteradas. Reinicie a operação.');
+      transaction.update(reference, {
+        passwordHash,
+        recoveryToken: null,
+        recoveryTokenExpires: null,
+      });
     });
   },
 

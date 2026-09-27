@@ -124,3 +124,16 @@ test('exclusão usa exclusivamente o userId autenticado na sessão', async () =>
   assert.equal(deletedId, 'user-a');
   assert.equal(anonymizedId, 'user-a');
 });
+
+test('exportação não apresenta arquivo incompleto quando a auditoria está indisponível', async (t) => {
+  const auditModule = require('../dist/utils/auditLogger');
+  t.mock.method(auditModule, 'getAllAuditLogsForUser', async () => {
+    throw new Error('offline');
+  });
+  t.mock.method(console, 'error', () => {});
+  const { LgpdController } = require('../dist/controllers/lgpdController');
+  const response = responseMock();
+  await LgpdController.exportData(requestMock(), response);
+  assert.equal(response.statusCode, 500);
+  assert.ok(response.body.error);
+});

@@ -21,6 +21,10 @@ O MathStats utiliza dados reais de futebol para montar atividades de matemática
 
 Os resultados da consulta permanecem em cache por cinco minutos em cada instância do servidor. Se o provedor ficar temporariamente indisponível, o backend pode reutilizar por até 24 horas a última resposta válida. A consulta possui tempo limite de cinco segundos e uma nova tentativa para falhas de rede ou erros do provedor.
 
+Requisições simultâneas para o mesmo time e temporada compartilham a consulta em andamento na mesma instância. Uma resposta vazia ou sem cinco partidas finalizadas válidas não substitui o cache. O cache não é compartilhado entre instâncias e desaparece quando elas são encerradas.
+
+Os cálculos ficam em `challengeBuilder.ts`. A resposta inicial não inclui a solução nem a explicação que revela o resultado; a explicação é entregue depois da resposta do aluno. O uso de dicas ainda é informado pelo navegador e não deve ser tratado como controle antifraude de uma avaliação formal.
+
 ## Dados pessoais
 
 Nenhum dado pessoal é enviado para a API-Football. A requisição contém apenas o identificador do time, a temporada e a chave do serviço.
@@ -33,6 +37,7 @@ O backend valida a estrutura recebida antes de utilizar os dados. Se não houver
 
 - `src/controllers/challengeController.ts`
 - `src/services/footballService.ts`
+- `src/services/challengeBuilder.ts`
 - `src/validation/challengeSchemas.ts`
 - `src/routes/challengeRoutes.ts`
 - `public/desafio/script.js`
