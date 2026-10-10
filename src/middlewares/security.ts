@@ -104,13 +104,34 @@ export const mfaEmailSendLimiter = rateLimit({
   message: { error: 'Limite de envios de código atingido. Aguarde 15 minutos.' },
 });
 
-export const recoveryLimiter = rateLimit({
-  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('recovery'),
+export const recoveryStartLimiter = rateLimit({
+  store:
+    process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('recovery-start'),
   windowMs: 15 * 60 * 1000,
-  max: 4,
+  max: 3,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Muitas tentativas de recuperação. Aguarde 15 minutos.' },
+  message: { error: 'Limite de envios de recuperação atingido. Aguarde 15 minutos.' },
+});
+
+export const recoveryVerifyLimiter = rateLimit({
+  store:
+    process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('recovery-verify'),
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas de código. Aguarde 15 minutos.' },
+});
+
+export const recoveryResetLimiter = rateLimit({
+  store:
+    process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('recovery-reset'),
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Limite de tentativas de nova senha atingido. Aguarde 15 minutos.' },
 });
 
 export const googleAuthLimiter = rateLimit({

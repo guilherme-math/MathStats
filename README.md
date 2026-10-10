@@ -102,6 +102,8 @@ Depois da primeira publicação, adicione a URL final da Vercel às origens auto
 
 A conta de serviço deve poder ler e gravar `users`, `challenges`, `sessions` e `rateLimits`. Os limites usam transações no Firestore e recusam a operação quando esse armazenamento está indisponível. Cada requisição privada verifica se a conta existe e se as credenciais ainda correspondem à sessão.
 
+O navegador não acessa o Firestore diretamente. As regras versionadas em `firestore.rules` recusam leituras e gravações pelos SDKs clientes; o backend utiliza o Admin SDK e deve receber somente as permissões IAM necessárias pela conta de serviço.
+
 Depois desta atualização, sessões antigas precisam de um novo login. Cadastros antigos sem os campos normalizados ainda podem ser encontrados pelo valor exato de usuário ou e-mail; o servidor não percorre toda a coleção para procurar uma conta.
 
 ## Organização do backend

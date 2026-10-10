@@ -5,7 +5,9 @@ import {
   loginLimiter,
   mfaLimiter,
   mfaEmailSendLimiter,
-  recoveryLimiter,
+  recoveryResetLimiter,
+  recoveryStartLimiter,
+  recoveryVerifyLimiter,
   googleAuthLimiter,
   signupLimiter,
 } from '../middlewares/security';
@@ -36,19 +38,19 @@ router.post(
 );
 router.post(
   '/recover/start',
-  recoveryLimiter,
+  recoveryStartLimiter,
   validateBody(recoveryStartSchema),
   RecoveryController.start,
 );
 router.post(
   '/recover/verify',
-  recoveryLimiter,
+  recoveryVerifyLimiter,
   validateBody(recoveryVerifySchema),
   RecoveryController.verify,
 );
 router.post(
   '/recover/reset',
-  recoveryLimiter,
+  recoveryResetLimiter,
   validateBody(recoveryResetSchema),
   RecoveryController.reset,
 );

@@ -137,3 +137,66 @@ test('exportação não apresenta arquivo incompleto quando a auditoria está in
   assert.equal(response.statusCode, 500);
   assert.ok(response.body.error);
 });
+
+test('solicitação de privacidade cria novo protocolo para o usuário da sessão', async (t) => {
+  const auditModule = require('../dist/utils/auditLogger');
+  const mailerModule = require('../dist/utils/mailer');
+  const { UserModel } = require('../dist/models/userModel');
+  const { LgpdController } = require('../dist/controllers/lgpdController');
+  let savedRequest;
+
+  t.mock.method(auditModule, 'audit', async () => {});
+  t.mock.method(mailerModule, 'sendPrivacyRequestNotification', async () => {});
+  t.mock.method(UserModel, 'findById', async (id) => ({
+    id,
+    username: 'aluno',
+    email: 'aluno@example.com',
+  }));
+  t.mock.method(UserModel, 'createPrivacyRequest', async (userId, type, detail) => {
+    savedRequest = { userId, type, detail };
+    return 'request-2';
+  });
+
+  const request = requestMock('user-a');
+  request.body = {
+    type: 'oposicao',
+    detail: '  Quero entender este tratamento.  ',
+    userId: 'user-b',
+  };
+  const response = responseMock();
+  await LgpdController.requestDataRight(request, response);
+
+  assert.equal(response.statusCode, 201);
+  assert.deepEqual(savedRequest, {
+    userId: 'user-a',
+    type: 'oposicao',
+    detail: 'Quero entender este tratamento.',
+  });
+  assert.deepEqual(response.body, {
+    message: 'Solicitação registrada e enviada ao e-mail do projeto para análise.',
+    requestId: 'request-2',
+    status: 'received',
+  });
+});
+
+test('solicitação de privacidade recusa tipo e descrição fora dos limites', async (t) => {
+  const { UserModel } = require('../dist/models/userModel');
+  const { LgpdController } = require('../dist/controllers/lgpdController');
+  const createMock = t.mock.method(UserModel, 'createPrivacyRequest', async () => 'request');
+
+  const invalidType = requestMock();
+  invalidType.body = { type: 'exclusao-imediata', detail: '' };
+  const invalidTypeResponse = responseMock();
+  await LgpdController.requestDataRight(invalidType, invalidTypeResponse);
+
+  const oversized = requestMock();
+  oversized.body = { type: 'oposicao', detail: 'a'.repeat(501) };
+  const oversizedResponse = responseMock();
+  await LgpdController.requestDataRight(oversized, oversizedResponse);
+
+  assert.equal(invalidTypeResponse.statusCode, 400);
+  assert.match(invalidTypeResponse.body.error, /tipo de solicitação inválido/i);
+  assert.equal(oversizedResponse.statusCode, 400);
+  assert.match(oversizedResponse.body.error, /no máximo 500 caracteres/i);
+  assert.equal(createMock.mock.callCount(), 0);
+});
