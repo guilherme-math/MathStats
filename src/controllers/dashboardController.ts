@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { UserModel } from '../models/userModel';
 import type { AppSession } from '../types/session';
 import { getEffectiveStreak, getStudyDateKey, previousStudyDateKey } from '../utils/streak';
+import { getLearningLevel } from '../utils/learningLevel';
 
 function serializeDate(value: any): string | null {
   if (!value) return null;
@@ -39,6 +40,8 @@ export const DashboardController = {
       const recentChallenges = challengeHistory.slice(0, 10);
       const challengesAnswered = Number(user.challengesAnswered) || 0;
       const challengesCorrect = Number(user.challengesCorrect) || 0;
+      const xpTotal = Number(user.xpTotal) || 0;
+      const level = getLearningLevel(xpTotal);
       const accuracy =
         challengesAnswered > 0 ? Math.round((challengesCorrect / challengesAnswered) * 100) : 0;
 
@@ -101,7 +104,8 @@ export const DashboardController = {
           displayName: user.displayName || user.username,
           username: user.username,
           email: user.email,
-          xpTotal: Number(user.xpTotal) || 0,
+          xpTotal,
+          level,
           streak: getEffectiveStreak(Number(user.streak) || 0, user.lastStudyDate || null),
           lastStudyDate: user.lastStudyDate || null,
           challengesAnswered,

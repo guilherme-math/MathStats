@@ -81,6 +81,9 @@
             <span>XP total</span><strong id="profileXp">Carregando...</strong>
           </div>
           <div class="profile-line">
+            <span>Nível</span><strong id="profileLevel">Carregando...</strong>
+          </div>
+          <div class="profile-line">
             <span>Ofensiva</span><strong id="profileStreak">Carregando...</strong>
           </div>
           <div class="profile-line">
@@ -117,6 +120,43 @@
           </div>
         </section>
       </div>
+
+      <section class="account-card mt-3" id="privacyRequestFormWrap" hidden>
+        <h3>Solicitar revisão de privacidade</h3>
+        <p>
+          Escolha o direito que deseja exercer. A solicitação receberá um protocolo para
+          acompanhamento nesta página.
+        </p>
+        <form id="privacyRequestForm" class="privacy-request-form">
+          <div class="field">
+            <label for="privacyRequestType">Tipo da solicitação</label>
+            <select id="privacyRequestType" required>
+              <option value="">Selecione uma opção</option>
+              <option value="bloqueio-ou-anonimizacao">Bloqueio ou anonimização</option>
+              <option value="oposicao">Oposição ao tratamento</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="privacyRequestDetail">Descrição (opcional)</label>
+            <textarea
+              id="privacyRequestDetail"
+              maxlength="500"
+              rows="4"
+              placeholder="Explique brevemente o que deseja revisar"
+            ></textarea>
+            <small id="privacyRequestCounter">0/500 caracteres</small>
+          </div>
+          <div class="privacy-request-actions">
+            <button class="primary-button loading-button" id="privacyRequestSubmit" type="submit">
+              ENVIAR SOLICITAÇÃO
+            </button>
+            <button class="secondary-button" id="privacyRequestCancel" type="button">
+              CANCELAR
+            </button>
+          </div>
+        </form>
+        <p class="feedback" id="privacyRequestFeedback" role="alert"></p>
+      </section>
 
       <section class="account-card mt-3">
         <h3>Atualizar nome de exibição</h3>

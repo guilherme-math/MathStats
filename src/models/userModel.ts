@@ -60,6 +60,8 @@ export interface PrivacyRequest {
   updatedAt: Timestamp | Date;
 }
 
+export type PrivacyRequestStatus = PrivacyRequest['status'];
+
 const usersCollection = db.collection('users');
 
 function docToUser(doc: DocumentSnapshot): User {
@@ -272,6 +274,17 @@ export const UserModel = {
       .orderBy('requestedAt', 'desc')
       .get();
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as PrivacyRequest);
+  },
+
+  updatePrivacyRequestStatus: async (
+    userId: string,
+    requestId: string,
+    status: PrivacyRequestStatus,
+  ): Promise<void> => {
+    const reference = usersCollection.doc(userId).collection('privacyRequests').doc(requestId);
+    const snapshot = await reference.get();
+    if (!snapshot.exists) throw new Error('Solicitação de privacidade não encontrada.');
+    await reference.update({ status, updatedAt: new Date() });
   },
 
   getChallengeHistory: async (id: string, limitCount = 10): Promise<ChallengeAttempt[]> => {

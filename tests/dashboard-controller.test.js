@@ -48,6 +48,7 @@ test('dashboard apresenta o estado inicial para aluno sem tentativas', async (t)
   assert.equal(response.statusCode, 200);
   assert.deepEqual(requestedIds, ['student-1', 'student-1']);
   assert.equal(response.body.user.challengesAnswered, 0);
+  assert.equal(response.body.user.level.name, 'Iniciante');
   assert.equal(response.body.user.accuracy, 0);
   assert.equal(response.body.dashboard.attemptsLast7Days, 0);
   assert.equal(response.body.dashboard.activity7Days.length, 7);
@@ -104,6 +105,13 @@ test('dashboard calcula big numbers, atividade semanal e desempenho por categori
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.user.xpTotal, 75);
+  assert.deepEqual(response.body.user.level, {
+    number: 1,
+    name: 'Iniciante',
+    currentXp: 75,
+    nextLevelXp: 100,
+    progress: 75,
+  });
   assert.equal(response.body.user.challengesIncorrect, 1);
   assert.equal(response.body.user.accuracy, 67);
   assert.equal(response.body.dashboard.attemptsLast7Days, 2);

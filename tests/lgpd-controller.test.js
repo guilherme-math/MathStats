@@ -200,3 +200,34 @@ test('solicitação de privacidade recusa tipo e descrição fora dos limites', 
   assert.match(oversizedResponse.body.error, /no máximo 500 caracteres/i);
   assert.equal(createMock.mock.callCount(), 0);
 });
+
+test('acompanhamento apresenta o estado atualizado das solicitações do aluno', async (t) => {
+  const { UserModel } = require('../dist/models/userModel');
+  const { LgpdController } = require('../dist/controllers/lgpdController');
+  t.mock.method(UserModel, 'getPrivacyRequests', async (userId) => {
+    assert.equal(userId, 'user-a');
+    return [
+      {
+        id: 'request-3',
+        type: 'bloqueio-ou-anonimizacao',
+        detail: 'Revisar estes dados.',
+        status: 'in_review',
+        requestedAt: new Date('2026-10-01T10:00:00.000Z'),
+        updatedAt: new Date('2026-10-02T10:00:00.000Z'),
+      },
+    ];
+  });
+
+  const response = responseMock();
+  await LgpdController.getPrivacyRequests(requestMock(), response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body.requests[0], {
+    id: 'request-3',
+    type: 'bloqueio-ou-anonimizacao',
+    detail: 'Revisar estes dados.',
+    status: 'in_review',
+    requestedAt: '2026-10-01T10:00:00.000Z',
+    updatedAt: '2026-10-02T10:00:00.000Z',
+  });
+});

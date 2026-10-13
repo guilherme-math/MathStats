@@ -11,6 +11,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "npm run build && node --test tests/*.test.js",
+    "test:coverage": "npm run build && node --test --experimental-test-coverage --test-coverage-lines=50 --test-coverage-branches=50 --test-coverage-functions=50 tests/*.test.js",
+    "privacy:status": "npm run build && node scripts/update-privacy-request.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run format:check && npm test"

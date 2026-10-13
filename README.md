@@ -17,7 +17,7 @@ Plataforma educacional de matemática e estatística contextualizada com dados d
 - Login opcional com Google Identity.
 - Perfil funcional `aluno` aplicado a todas as contas desta versão.
 - Desafios baseados na API-Football.
-- XP, ofensiva, tentativas e dashboard persistentes por usuário.
+- XP, nível de aprendizagem, ofensiva, tentativas e dashboard persistentes por usuário.
 - Consulta, exportação completa, atualização do nome de exibição, exclusão e acompanhamento de solicitações LGPD.
 - Filtro local de linguagem inadequada para nome de exibição e username.
 
@@ -52,8 +52,22 @@ O servidor local usa HTTPS. Se `key.pem` e `cert.pem` não existirem, gera certi
 npm run dev    inicia o servidor HTTPS local
 npm run build  compila o TypeScript
 npm test       compila e executa a suíte automatizada
+npm run test:coverage  exige no mínimo 50% de linhas, funções e ramificações cobertas
 npm start      executa a compilação local
 ```
+
+## Atendimento de solicitações de privacidade
+
+O aluno abre e acompanha solicitações pela área de Conta. A atualização de estado é uma operação
+interna, executada sem expor controles administrativos na interface do estudante:
+
+```text
+npm run privacy:status -- <userId> <requestId> <received|in_review|completed|rejected>
+```
+
+O comando compila o backend, confirma que a conta e a solicitação existem, atualiza a data da
+alteração e registra o evento no histórico de auditoria. Ele usa as mesmas credenciais Firebase e
+MongoDB configuradas para o ambiente local.
 
 ## Dados e retenção
 

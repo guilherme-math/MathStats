@@ -607,6 +607,41 @@ button:disabled {
   color: var(--text-secondary);
   font-size: 0.78rem;
 }
+.privacy-request-form {
+  display: grid;
+  gap: 16px;
+  max-width: 720px;
+}
+.field select,
+.field textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font: inherit;
+  padding: 13px 14px;
+}
+.field textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-soft);
+}
+.field small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+.privacy-request-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
 .profile-line {
   display: flex;
   justify-content: space-between;
@@ -708,6 +743,11 @@ button:disabled {
   }
   .auth-shell {
     padding-top: 36px;
+  }
+}
+@media (max-width: 560px) {
+  .privacy-request-actions {
+    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 575px) {
@@ -1205,7 +1245,7 @@ body[data-page='register'] .auth-shell {
 }
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
 }
 .metric-card {

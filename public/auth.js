@@ -931,6 +931,7 @@
     var accuracy = Number(user.accuracy) || 0;
     var streak = Number(user.streak) || 0;
     var xp = Number(user.xpTotal) || 0;
+    var level = user.level || { number: 1, name: 'Iniciante' };
     var attemptsWeek = Number(dashboard.attemptsLast7Days) || 0;
     var weekAccuracy = Number(dashboard.accuracyLast7Days) || 0;
     var weekXp = Number(dashboard.xpLast7Days) || 0;
@@ -950,6 +951,8 @@
       el('openChallengeBtn').textContent = answered > 0 ? 'CONTINUAR TRILHA' : 'COMEÇAR ATIVIDADE';
 
     if (el('metricXp')) el('metricXp').textContent = xp.toLocaleString('pt-BR');
+    if (el('metricLevel')) el('metricLevel').textContent = String(level.number || 1);
+    if (el('metricLevelText')) el('metricLevelText').textContent = level.name || 'Iniciante';
     if (el('metricStreak')) el('metricStreak').textContent = '🔥 ' + streak;
     if (el('metricStreakText'))
       el('metricStreakText').textContent = streak === 1 ? 'dia consecutivo' : 'dias consecutivos';
@@ -1025,6 +1028,12 @@
       if (el('profileXp'))
         el('profileXp').textContent =
           (Number(currentUser.xpTotal) || 0).toLocaleString('pt-BR') + ' XP';
+      if (el('profileLevel'))
+        el('profileLevel').textContent =
+          'Nível ' +
+          (currentUser.level?.number || 1) +
+          ' · ' +
+          (currentUser.level?.name || 'Iniciante');
       if (el('profileStreak')) {
         var streak = Number(currentUser.streak) || 0;
         el('profileStreak').textContent = '🔥 ' + streak + (streak === 1 ? ' dia' : ' dias');
@@ -1221,36 +1230,65 @@
       });
 
     if (el('rightsRequestBtn'))
-      el('rightsRequestBtn').addEventListener('click', async function () {
-        var choice = window.prompt(
-          'Digite 1 para bloqueio/anonimização ou 2 para oposição ao tratamento:',
-          '',
-        );
-        if (choice !== '1' && choice !== '2') return;
-        var type = choice === '1' ? 'bloqueio-ou-anonimizacao' : 'oposicao';
-        var detail = window.prompt('Explique brevemente sua solicitação (opcional):', '') || '';
-        var result = await requestJson('/api/lgpd/request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: type, detail: detail }),
-        });
-        if (result.response.ok) {
-          setFeedback(
-            'accountFeedback',
-            result.data.message + ' Protocolo: ' + result.data.requestId,
-            true,
-          );
-          if (
-            el('privacyRequestsWrap') &&
-            !el('privacyRequestsWrap').hidden &&
-            el('privacyRequestsBtn')
-          )
-            el('privacyRequestsBtn').click();
-        } else
-          setFeedback(
-            'accountFeedback',
-            result.data.error || 'Não foi possível registrar a solicitação.',
-          );
+      el('rightsRequestBtn').addEventListener('click', function () {
+        el('privacyRequestFormWrap').hidden = false;
+        el('privacyRequestType').focus();
+      });
+
+    if (el('privacyRequestCancel'))
+      el('privacyRequestCancel').addEventListener('click', function () {
+        el('privacyRequestForm').reset();
+        el('privacyRequestCounter').textContent = '0/500 caracteres';
+        el('privacyRequestFormWrap').hidden = true;
+        setFeedback('privacyRequestFeedback', '');
+      });
+
+    if (el('privacyRequestDetail'))
+      el('privacyRequestDetail').addEventListener('input', function () {
+        el('privacyRequestCounter').textContent = this.value.length + '/500 caracteres';
+      });
+
+    if (el('privacyRequestForm'))
+      el('privacyRequestForm').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        var type = el('privacyRequestType').value;
+        var detail = el('privacyRequestDetail').value.trim();
+        var button = el('privacyRequestSubmit');
+        if (!type) {
+          setFeedback('privacyRequestFeedback', 'Selecione o tipo da solicitação.');
+          return;
+        }
+        setLoading(button, true);
+        try {
+          var result = await requestJson('/api/lgpd/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type, detail: detail }),
+          });
+          if (result.response.ok) {
+            setFeedback(
+              'privacyRequestFeedback',
+              result.data.message + ' Protocolo: ' + result.data.requestId,
+              true,
+            );
+            el('privacyRequestForm').reset();
+            el('privacyRequestCounter').textContent = '0/500 caracteres';
+            if (
+              el('privacyRequestsWrap') &&
+              !el('privacyRequestsWrap').hidden &&
+              el('privacyRequestsBtn')
+            )
+              el('privacyRequestsBtn').click();
+          } else
+            setFeedback(
+              'privacyRequestFeedback',
+              result.data.error || 'Não foi possível registrar a solicitação.',
+            );
+        } catch (error) {
+          setFeedback('privacyRequestFeedback', 'Não foi possível conectar ao servidor.');
+        } finally {
+          setLoading(button, false);
+        }
       });
 
     if (el('deleteBtn'))
