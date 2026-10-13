@@ -1,6 +1,12 @@
 node_modules
 dist
 coverage
+.review_*/
+output/
+tmp/
+*.docx
+*.png
+*.svg
 .vercel
 .env
 .env.*
