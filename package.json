@@ -15,7 +15,8 @@
     "privacy:status": "npm run build && node scripts/update-privacy-request.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run format:check && npm test"
+    "check": "npm run format:check && npm test",
+    "test:integration": "npm run build && node tests/integration/run.js"
   },
   "dependencies": {
     "argon2": "^0.44.0",
@@ -56,6 +57,8 @@
     "@types/selfsigned": "^2.0.4",
     "@types/speakeasy": "^2.0.10",
     "@types/supertest": "^7.2.1",
+    "firebase-tools": "^15.34.2",
+    "mongodb-memory-server": "^11.3.0",
     "prettier": "^3.6.2",
     "supertest": "^7.2.2",
     "ts-node-dev": "^2.0.0",
