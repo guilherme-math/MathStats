@@ -340,10 +340,14 @@ export const UserModel = {
 
   deleteUser: async (id: string): Promise<void> => {
     const userRef = usersCollection.doc(id);
-    for (const collectionName of ['attempts', 'privacyRequests']) {
-      const childCollection = userRef.collection(collectionName);
+    const ownedRecords = [
+      userRef.collection('attempts'),
+      userRef.collection('privacyRequests'),
+      db.collection('challenges').where('userId', '==', id),
+    ];
+    for (const records of ownedRecords) {
       while (true) {
-        const snapshot = await childCollection.limit(400).get();
+        const snapshot = await records.limit(400).get();
         if (snapshot.empty) break;
         const batch = db.batch();
         snapshot.docs.forEach((doc) => batch.delete(doc.ref));
