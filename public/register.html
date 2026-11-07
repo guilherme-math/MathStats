@@ -51,8 +51,8 @@
           <p class="eyebrow">NOVO PERFIL / CONFIGURAÇÃO</p>
           <h1>CRIE SUA<br /><span>CONTA</span></h1>
           <p>
-            Cadastre-se com Google ou com e-mail e senha. Contas com senha usam autenticação em duas
-            etapas; o acesso com Google utiliza a verificação da própria conta Google.
+            Cadastre-se com Google ou com e-mail e senha. Você pode ativar a verificação em duas
+            etapas para o acesso por senha.
           </p>
         </section>
 
@@ -182,6 +182,11 @@
                 hidden
               ></div>
 
+              <label class="consent-inline" for="signupMfa">
+                <input id="signupMfa" type="checkbox" /><span
+                  >Ativar verificação em duas etapas (opcional)</span
+                >
+              </label>
               <button class="primary-button loading-button" id="signupBtn" type="submit">
                 CRIAR CONTA COM E-MAIL
               </button>
@@ -190,7 +195,7 @@
 
             <div class="success-panel" id="successBox" hidden>
               <strong>CONTA CRIADA</strong>
-              <p>
+              <p id="signupMfaInstructions">
                 Escaneie este QR Code no seu aplicativo autenticador. Você também receberá uma cópia
                 por e-mail.
               </p>

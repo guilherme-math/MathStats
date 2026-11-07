@@ -20,6 +20,7 @@ export const signupSchema = z
     email: z.email().max(254),
     password,
     lgpdAccepted: z.literal(true),
+    enableMfa: z.boolean().optional(),
   })
   .strict();
 
@@ -57,6 +58,14 @@ export const passwordChangeSchema = z
   .object({
     password,
     currentPassword: z.string().max(128).optional(),
+  })
+  .strict();
+
+export const mfaPreferenceSchema = z
+  .object({
+    action: z.enum(['setup', 'enable', 'disable', 'send-disable-email', 'disable-by-email']),
+    password,
+    token: code.optional(),
   })
   .strict();
 

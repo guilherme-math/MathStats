@@ -7,7 +7,15 @@ export function credentialFingerprint(user: User): string {
   const secret = process.env.SESSION_SECRET;
   if (!secret) throw new Error('SESSION_SECRET não configurado.');
   return createHmac('sha256', secret)
-    .update(JSON.stringify([user.id, user.passwordHash, user.googleId, user.twoFactorSecret]))
+    .update(
+      JSON.stringify([
+        user.id,
+        user.passwordHash,
+        user.googleId,
+        user.twoFactorSecret,
+        ...(user.mfaEnabled === undefined ? [] : [user.mfaEnabled]),
+      ]),
+    )
     .digest('hex');
 }
 

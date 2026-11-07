@@ -49,16 +49,14 @@ function verificationEmail(username: string, code: string, purpose: 'login' | 'r
   const safeName = escapeHtml(username);
   const safeCode = escapeHtml(code);
   const isLogin = purpose === 'login';
-  const destination = isLogin ? 'mfa' : 'recover';
-  const actionUrl = `${appBaseUrl}/${destination}#email-code=${encodeURIComponent(code)}`;
 
   return emailLayout(`
     <div style="text-align:center;">
       <p style="margin:0 0 10px;font-size:15px;color:#5e6964;">Olá, <strong style="color:#171c19;">${safeName}</strong>.</p>
       <h1 style="margin:0 0 34px;font-size:24px;font-weight:700;color:#171c19;">${isLogin ? 'Seu código de verificação' : 'Código para redefinir sua senha'}</h1>
       <p style="margin:0 0 18px;font-size:14px;color:#4d5752;">${isLogin ? 'Use o código abaixo para concluir seu acesso ao MathStats:' : 'Use o código abaixo para continuar a recuperação da sua conta:'}</p>
-      <a href="${actionUrl}" title="Abrir o MathStats com o código preenchido" style="display:inline-block;margin:0 auto 10px;padding:18px 26px;border:1px solid #dfe6e2;background:#f7faf8;font-size:30px;line-height:1;font-weight:800;letter-spacing:3px;color:#07110d;text-decoration:none;user-select:all;cursor:pointer;">${safeCode}</a>
-      <p style="margin:0 0 22px;font-size:12px;color:#68736e;">Clique no código para abrir o MathStats com o campo preenchido.</p>
+      <span style="display:inline-block;margin:0 auto 10px;padding:18px 26px;border:1px solid #dfe6e2;background:#f7faf8;font-size:30px;line-height:1;font-weight:800;letter-spacing:3px;color:#07110d;user-select:all;">${safeCode}</span>
+      <p style="margin:0 0 22px;font-size:12px;color:#68736e;">Copie o código e cole no campo de verificação do MathStats.</p>
       <p style="margin:0;font-size:13px;line-height:1.7;color:#4d5752;">Este código só pode ser usado no fluxo atual e expira em <strong>15 minutos</strong>.</p>
       <p style="margin:34px 0 0;font-size:12px;line-height:1.7;color:#8a938f;">${isLogin ? 'Se você não tentou entrar no MathStats, ignore este e-mail e considere alterar sua senha.' : 'Se você não solicitou a recuperação de senha, ignore este e-mail. Sua senha atual permanece a mesma.'}</p>
     </div>`);
@@ -114,6 +112,27 @@ export async function sendRecoveryCodeEmail(
     to,
     subject: `${code} é seu código de recuperação | MathStats`,
     html: verificationEmail(username, code, 'recovery'),
+  });
+}
+
+export async function sendMfaDisableEmail(
+  to: string,
+  username: string,
+  code: string,
+): Promise<void> {
+  await transporter.sendMail({
+    from: `"MATH/STATS" <${process.env.GMAIL_USER}>`,
+    to,
+    subject: 'Código para desativar a verificação em duas etapas | MathStats',
+    html: emailLayout(`
+      <div style="text-align:center;">
+        <p>Olá, <strong>${escapeHtml(username)}</strong>.</p>
+        <h1 style="font-size:24px;">Confirme a desativação do 2FA</h1>
+        <p>Copie o código e cole no campo da sua conta no MathStats.</p>
+        <span style="display:inline-block;padding:18px 26px;border:1px solid #dfe6e2;background:#f7faf8;font-size:30px;font-weight:800;letter-spacing:3px;user-select:all;">${escapeHtml(code)}</span>
+        <p>O código expira em 10 minutos e vale apenas para esta solicitação.</p>
+        <p>Se você não pediu a desativação, ignore este e-mail.</p>
+      </div>`),
   });
 }
 

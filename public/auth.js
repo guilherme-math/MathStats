@@ -101,6 +101,8 @@
     var success = el('successBox');
     var image = el('qrCodeImg');
     if (image && qrCodeUrl) image.src = qrCodeUrl;
+    if (image) image.hidden = !qrCodeUrl;
+    if (el('signupMfaInstructions')) el('signupMfaInstructions').hidden = !qrCodeUrl;
     if (form) form.hidden = true;
     if (success) success.hidden = false;
     setFeedback('signupFeedback', '');
@@ -454,11 +456,11 @@
             email: email,
             password: password,
             lgpdAccepted: true,
+            enableMfa: el('signupMfa').checked,
           }),
         });
 
-        if (result.response.ok && result.data.qrCodeUrl)
-          showRegistrationSuccess(result.data.qrCodeUrl);
+        if (result.response.ok) showRegistrationSuccess(result.data.qrCodeUrl);
         else setFeedback('signupFeedback', result.data.error || 'Não foi possível criar a conta.');
       } catch (error) {
         setFeedback('signupFeedback', 'Não foi possível conectar ao servidor.');
@@ -1066,6 +1068,110 @@
       return;
     }
 
+    var mfaForm = el('accountMfaForm');
+    var mfaAction;
+    var mfaEmailToggle = el('accountMfaEmailToggle');
+    function renderMfaAction() {
+      var viaEmail = mfaAction === 'send-disable-email' || mfaAction === 'disable-by-email';
+      var needsCode = mfaAction !== 'setup' && mfaAction !== 'send-disable-email';
+      el('accountMfaTokenField').hidden = !needsCode;
+      el('accountMfaToken').required = needsCode;
+      el('accountMfaTokenLabel').textContent = viaEmail
+        ? 'Código recebido por e-mail'
+        : 'Código do aplicativo autenticador';
+      el('accountMfaSubmit').textContent = {
+        setup: 'CONFIGURAR 2FA',
+        enable: 'CONFIRMAR ATIVAÇÃO',
+        disable: 'DESATIVAR 2FA',
+        'send-disable-email': 'ENVIAR CÓDIGO',
+        'disable-by-email': 'CONFIRMAR DESATIVAÇÃO',
+      }[mfaAction];
+      mfaEmailToggle.hidden = !currentUser.mfaEnabled || mfaAction === 'enable';
+      mfaEmailToggle.textContent = viaEmail
+        ? 'Cancelar verificação por e-mail'
+        : 'Não tenho acesso ao autenticador';
+    }
+    function showMfaPreference() {
+      var active = currentUser.mfaEnabled;
+      mfaAction = active && currentUser.mfaHasAuthenticator ? 'disable' : 'setup';
+      el('mfaPreferences').hidden = !currentUser.hasPassword;
+      el('accountMfaStatus').textContent = active
+        ? mfaAction === 'setup'
+          ? '2FA ativo por e-mail. Configure um autenticador para gerenciar a proteção.'
+          : '2FA ativo no login por senha.'
+        : '2FA desativado. Você pode ativá-lo para proteger seu login por senha.';
+      el('accountMfaQr').hidden = true;
+      el('accountMfaQr').removeAttribute('src');
+      renderMfaAction();
+    }
+    if (mfaForm) {
+      showMfaPreference();
+      mfaEmailToggle.addEventListener('click', function () {
+        el('accountMfaToken').value = '';
+        if (mfaAction === 'send-disable-email' || mfaAction === 'disable-by-email') {
+          showMfaPreference();
+          setFeedback('accountMfaFeedback', '');
+        } else {
+          mfaAction = 'send-disable-email';
+          renderMfaAction();
+          setFeedback(
+            'accountMfaFeedback',
+            'Informe sua senha atual para receber um código de desativação.',
+            true,
+          );
+          el('accountMfaPassword').focus();
+        }
+      });
+      mfaForm.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        var button = el('accountMfaSubmit');
+        var message = '';
+        var success = false;
+        setLoading(button, true);
+        mfaEmailToggle.disabled = true;
+        try {
+          var response = await requestJson('/api/account/mfa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: mfaAction,
+              password: el('accountMfaPassword').value,
+              token: el('accountMfaToken').required ? el('accountMfaToken').value : undefined,
+            }),
+          });
+          if (!response.response.ok)
+            message = response.data.error || 'Não foi possível alterar o 2FA.';
+          else if (mfaAction === 'send-disable-email') {
+            mfaAction = 'disable-by-email';
+            message = response.data.message;
+            success = true;
+          } else if (mfaAction === 'setup') {
+            mfaAction = 'enable';
+            el('accountMfaQr').src = response.data.qrCodeUrl;
+            el('accountMfaQr').hidden = false;
+            el('accountMfaTokenField').hidden = false;
+            el('accountMfaToken').required = true;
+            message = 'Escaneie o QR Code e confirme com o código do aplicativo.';
+            success = true;
+          } else {
+            currentUser.mfaEnabled = response.data.mfaEnabled;
+            currentUser.mfaHasAuthenticator = response.data.mfaEnabled;
+            mfaForm.reset();
+            showMfaPreference();
+            message = response.data.mfaEnabled ? '2FA ativado.' : '2FA desativado.';
+            success = true;
+          }
+        } catch (error) {
+          message = 'Não foi possível conectar ao servidor.';
+        } finally {
+          setLoading(button, false);
+          mfaEmailToggle.disabled = false;
+          renderMfaAction();
+          setFeedback('accountMfaFeedback', message, success);
+        }
+      });
+    }
+
     if (el('passwordSetupForm')) {
       el('passwordSetupForm').addEventListener('submit', async function (event) {
         event.preventDefault();
@@ -1099,6 +1205,7 @@
             setFeedback('accountPasswordFeedback', result.data.message || 'Senha salva.', true);
             if (el('profilePassword')) el('profilePassword').textContent = 'Configurada';
             currentUser.hasPassword = true;
+            if (mfaForm) showMfaPreference();
             el('accountCurrentPassword').value = '';
             el('accountNewPassword').value = '';
             el('accountConfirmPassword').value = '';

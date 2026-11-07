@@ -12,6 +12,8 @@ export type AppSession = Session & {
   mfaEmailCodeHash?: string;
   mfaEmailExpires?: number;
   mfaEmailUserId?: string;
+  mfaSetup?: { secret: string; expires: number };
+  mfaDisableEmail?: { hash: string; expires: number; fingerprint: string; attempts: number };
   pendingRecoveryUserId?: string;
   recoveryVerified?: boolean;
   recoveryExpires?: number;

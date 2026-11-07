@@ -18,6 +18,7 @@ export interface User {
   role: UserRole;
   passwordHash: string;
   twoFactorSecret: string;
+  mfaEnabled?: boolean;
   trailProgress?: TrailProgress;
   trailRuns?: Partial<Record<TrailId, string>>;
   legalAcceptedAt?: Timestamp | Date;
@@ -157,6 +158,7 @@ export const UserModel = {
     email: string;
     passwordHash: string;
     twoFactorSecret: string;
+    mfaEnabled?: boolean;
     legalAcceptedAt: Date;
     termsVersion: string;
     privacyPolicyVersion: string;
@@ -226,6 +228,22 @@ export const UserModel = {
       )
         return false;
       transaction.update(reference, { recoveryToken: null, recoveryTokenExpires: null });
+      return true;
+    });
+  },
+
+  updateMfa: async (user: User, secret: string, enabled: boolean): Promise<boolean> => {
+    const ref = usersCollection.doc(user.id);
+    return db.runTransaction(async (transaction) => {
+      const current = (await transaction.get(ref)).data();
+      if (
+        !current ||
+        current.passwordHash !== user.passwordHash ||
+        current.twoFactorSecret !== user.twoFactorSecret ||
+        current.mfaEnabled !== user.mfaEnabled
+      )
+        return false;
+      transaction.update(ref, { twoFactorSecret: secret, mfaEnabled: enabled });
       return true;
     });
   },

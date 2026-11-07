@@ -177,6 +177,42 @@
         <p class="feedback" id="profileCorrectionFeedback" role="alert"></p>
       </section>
 
+      <section class="account-card mt-3" id="mfaPreferences" hidden>
+        <h3>Verificação em duas etapas</h3>
+        <p id="accountMfaStatus"></p>
+        <form id="accountMfaForm" class="password-setup-grid">
+          <div class="field">
+            <label for="accountMfaPassword">Senha atual</label>
+            <input
+              id="accountMfaPassword"
+              type="password"
+              autocomplete="current-password"
+              maxlength="128"
+              required
+            />
+          </div>
+          <img id="accountMfaQr" width="180" height="180" alt="QR Code do autenticador" hidden />
+          <div class="field" id="accountMfaTokenField" hidden>
+            <label for="accountMfaToken" id="accountMfaTokenLabel"
+              >Código do aplicativo autenticador</label
+            >
+            <input
+              id="accountMfaToken"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              pattern="[0-9]{6}"
+              maxlength="6"
+            />
+          </div>
+          <button class="primary-button loading-button" id="accountMfaSubmit" type="submit">
+            CONFIGURAR 2FA
+          </button>
+          <button class="secondary-button" id="accountMfaEmailToggle" type="button" hidden>
+            Não tenho acesso ao autenticador
+          </button>
+          <p class="feedback" id="accountMfaFeedback" role="status"></p>
+        </form>
+      </section>
       <section class="account-card mt-3" id="passwordSetup">
         <h3 id="accountPasswordTitle">Gerenciar senha</h3>
         <p id="accountPasswordDescription">

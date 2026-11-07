@@ -132,6 +132,8 @@ export const DashboardController = {
             respondidoEm: serializeDate(attempt.respondidoEm),
           })),
           hasPassword: Boolean(user.passwordHash),
+          mfaEnabled: Boolean(user.passwordHash && user.mfaEnabled !== false),
+          mfaHasAuthenticator: Boolean(user.twoFactorSecret),
           googleLinked: Boolean(user.googleId),
         },
         dashboard: {

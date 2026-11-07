@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { UserModel } from '../models/userModel';
 import { encryptAES, decryptAES } from '../utils/crypto';
-import { sendWelcomeEmail, sendMfaCodeEmail } from '../utils/mailer';
+import { sendWelcomeEmail, sendMfaCodeEmail, sendMfaDisableEmail } from '../utils/mailer';
 import { audit } from '../utils/auditLogger';
 import type { AppSession } from '../types/session';
 import { validatePublicIdentity } from '../utils/contentFilter';
@@ -30,6 +30,16 @@ function getIp(req: Request): string {
 
 function hashCode(code: string): string {
   return crypto.createHash('sha256').update(code).digest('hex');
+}
+
+function trustedDeviceCredential(user: {
+  passwordHash: string;
+  mfaEnabled?: boolean;
+  twoFactorSecret: string;
+}): string {
+  return user.mfaEnabled === undefined
+    ? user.passwordHash
+    : `${user.passwordHash}:${user.twoFactorSecret}`;
 }
 
 function validUsername(username: string): boolean {
@@ -125,24 +135,28 @@ export const AuthController = {
       }
 
       const passwordHash = await hashPassword(password);
-      const mfaSecret = speakeasy.generateSecret({ name: `MathStats (${usernameNormalized})` });
-      const encryptedSecret = encryptAES(mfaSecret.base32);
+      const mfaEnabled = req.body.enableMfa !== false;
+      const mfaSecret = mfaEnabled
+        ? speakeasy.generateSecret({ name: `MathStats (${usernameNormalized})` })
+        : null;
+      const qrCodeImage = mfaSecret ? await qrcode.toDataURL(mfaSecret.otpauth_url!) : null;
 
       const user = await UserModel.create({
         displayName: displayNameValue,
         username: usernameNormalized,
         email: emailNormalized,
         passwordHash,
-        twoFactorSecret: encryptedSecret,
+        twoFactorSecret: mfaSecret ? encryptAES(mfaSecret.base32) : '',
+        mfaEnabled,
         legalAcceptedAt: new Date(),
         ...LEGAL_DOCUMENTS,
       });
 
-      const qrCodeImage = await qrcode.toDataURL(mfaSecret.otpauth_url!);
-
-      void sendWelcomeEmail(emailNormalized, displayNameValue, qrCodeImage).catch((error) =>
-        console.error('[mailer] Falha ao enviar e-mail de boas-vindas:', error),
-      );
+      if (qrCodeImage) {
+        void sendWelcomeEmail(emailNormalized, displayNameValue, qrCodeImage).catch((error) =>
+          console.error('[mailer] Falha ao enviar e-mail de boas-vindas:', error),
+        );
+      }
 
       await audit({
         event: 'SIGNUP',
@@ -153,7 +167,9 @@ export const AuthController = {
       });
 
       return res.status(201).json({
-        message: 'Conta criada com sucesso. Configure o 2FA antes do primeiro acesso.',
+        message: mfaEnabled
+          ? 'Conta criada. Configure o 2FA antes do primeiro acesso.'
+          : 'Conta criada com sucesso.',
         qrCodeUrl: qrCodeImage,
       });
     } catch (error) {
@@ -195,7 +211,12 @@ export const AuthController = {
         detail: 'Senha validada',
       });
 
-      if (isTrustedDevice(req, user.id, user.passwordHash)) {
+      if (user.mfaEnabled === false) {
+        await authenticateSession(req, user);
+        return res.json({ message: 'Acesso liberado.', authenticated: true });
+      }
+
+      if (isTrustedDevice(req, user.id, trustedDeviceCredential(user))) {
         await authenticateSession(req, user);
         await audit({
           event: 'LOGIN_2FA_SUCCESS',
@@ -224,6 +245,101 @@ export const AuthController = {
       return res
         .status(500)
         .json({ error: 'Erro ao processar o login. Tente novamente em instantes.' });
+    }
+  },
+
+  async setMfaPreference(req: Request, res: Response) {
+    const { action, password, token } = req.body;
+    const session = getSession(req);
+    try {
+      const user = await UserModel.findById(session.userId!);
+      if (!user?.passwordHash || !(await argon2.verify(user.passwordHash, password))) {
+        return res.status(401).json({ error: 'Confirme sua senha atual.' });
+      }
+      const enabled = user.mfaEnabled !== false;
+      const disabling =
+        action === 'disable' || action === 'send-disable-email' || action === 'disable-by-email';
+      if ((disabling && !enabled) || (!disabling && enabled && user.twoFactorSecret)) {
+        return res
+          .status(409)
+          .json({ error: 'O estado da verificação mudou. Recarregue a página.' });
+      }
+      if (action === 'send-disable-email') {
+        if (!user.email) return res.status(400).json({ error: 'E-mail da conta não encontrado.' });
+        const code = crypto.randomInt(1_000_000).toString().padStart(6, '0');
+        await sendMfaDisableEmail(user.email, user.username, code);
+        session.mfaDisableEmail = {
+          hash: hashCode(code),
+          expires: Date.now() + 10 * 60 * 1000,
+          fingerprint: credentialFingerprint(user),
+          attempts: 0,
+        };
+        return res.json({
+          message: 'Código enviado ao e-mail cadastrado. Ele vale por 10 minutos.',
+        });
+      }
+      if (action === 'setup') {
+        const secret = speakeasy.generateSecret({ name: `MathStats (${user.username})` });
+        const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url!);
+        session.mfaSetup = {
+          secret: encryptAES(secret.base32),
+          expires: Date.now() + 10 * 60 * 1000,
+        };
+        return res.json({ qrCodeUrl });
+      }
+      const encrypted =
+        action === 'enable'
+          ? session.mfaSetup && session.mfaSetup.expires > Date.now()
+            ? session.mfaSetup.secret
+            : ''
+          : user.twoFactorSecret;
+      const secret = encrypted && decryptAES(encrypted);
+      if (action === 'disable-by-email') {
+        const pending = session.mfaDisableEmail;
+        if (
+          !pending ||
+          pending.expires <= Date.now() ||
+          pending.fingerprint !== credentialFingerprint(user) ||
+          pending.attempts >= 3
+        ) {
+          delete session.mfaDisableEmail;
+          return res.status(400).json({ error: 'Solicite um novo código por e-mail.' });
+        }
+        if (
+          !token ||
+          !crypto.timingSafeEqual(Buffer.from(pending.hash), Buffer.from(hashCode(token)))
+        ) {
+          pending.attempts += 1;
+          return res.status(400).json({ error: 'Código de desativação incorreto.' });
+        }
+        delete session.mfaDisableEmail;
+      } else if (
+        !secret ||
+        !token ||
+        !speakeasy.totp.verify({ secret, encoding: 'base32', token, window: 1 })
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'Código do autenticador inválido ou configuração expirada.' });
+      }
+      const mfaEnabled = action === 'enable';
+      const twoFactorSecret = mfaEnabled ? encrypted : '';
+      if (!(await UserModel.updateMfa(user, twoFactorSecret, mfaEnabled))) {
+        return res.status(409).json({ error: 'As credenciais mudaram. Entre novamente.' });
+      }
+      await authenticateSession(req, { ...user, mfaEnabled, twoFactorSecret });
+      await audit({
+        event: mfaEnabled ? 'MFA_ENABLED' : 'MFA_DISABLED',
+        userId: user.id,
+        username: user.username,
+        ip: getIp(req),
+      });
+      return res.json({ mfaEnabled });
+    } catch (error) {
+      console.error('[mfa/preference]', error);
+      return res
+        .status(500)
+        .json({ error: 'Não foi possível atualizar a verificação em duas etapas.' });
     }
   },
 
@@ -326,7 +442,7 @@ export const AuthController = {
       await authenticateSession(req, user);
 
       if (rememberDevice === true && user.passwordHash) {
-        rememberTrustedDevice(req, res, user.id, user.passwordHash);
+        rememberTrustedDevice(req, res, user.id, trustedDeviceCredential(user));
       }
 
       await audit({
@@ -462,6 +578,7 @@ export const AuthController = {
         email: emailNormalized,
         passwordHash: '',
         twoFactorSecret: '',
+        mfaEnabled: false,
         legalAcceptedAt: new Date(),
         ...LEGAL_DOCUMENTS,
         googleId,

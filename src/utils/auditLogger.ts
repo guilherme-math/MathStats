@@ -5,6 +5,8 @@ export type AuditEvent =
   | 'LOGIN_FAILURE'
   | 'LOGIN_2FA_SUCCESS'
   | 'LOGIN_2FA_FAILURE'
+  | 'MFA_ENABLED'
+  | 'MFA_DISABLED'
   | 'LOGOUT'
   | 'SIGNUP'
   | 'SIGNUP_REJECTED'
