@@ -6,6 +6,7 @@ import type {
   Timestamp,
 } from 'firebase-admin/firestore';
 import { DEFAULT_USER_ROLE, normalizeUserRole, type UserRole } from '../config/userRoles';
+import type { TrailId, TrailProgress } from '../services/trailProgress';
 
 export interface User {
   id: string;
@@ -17,6 +18,8 @@ export interface User {
   role: UserRole;
   passwordHash: string;
   twoFactorSecret: string;
+  trailProgress?: TrailProgress;
+  trailRuns?: Partial<Record<TrailId, string>>;
   legalAcceptedAt?: Timestamp | Date;
   lgpdAcceptedAt?: Timestamp | Date;
   termsVersion?: string;

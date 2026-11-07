@@ -35,6 +35,7 @@ test('controller gera desafio vinculado ao aluno autenticado', async (t) => {
   const firebase = require('../dist/config/firebase');
   const auditLogger = require('../dist/utils/auditLogger');
   const { gerarDesafio } = require('../dist/controllers/challengeController');
+  t.mock.method(require('../dist/models/userModel').UserModel, 'findById', async (id) => ({ id }));
   let savedChallenge;
   let auditEntry;
 

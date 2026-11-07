@@ -3,6 +3,7 @@ import { UserModel } from '../models/userModel';
 import type { AppSession } from '../types/session';
 import { getEffectiveStreak, getStudyDateKey, previousStudyDateKey } from '../utils/streak';
 import { getLearningLevel } from '../utils/learningLevel';
+import { summarizeTrail, trailLengths, type TrailId } from '../services/trailProgress';
 
 function serializeDate(value: any): string | null {
   if (!value) return null;
@@ -106,6 +107,12 @@ export const DashboardController = {
           email: user.email,
           xpTotal,
           level,
+          trilhas: Object.fromEntries(
+            (Object.keys(trailLengths) as TrailId[]).map((trail) => [
+              trail,
+              summarizeTrail(user.trailProgress, trail),
+            ]),
+          ),
           streak: getEffectiveStreak(Number(user.streak) || 0, user.lastStudyDate || null),
           lastStudyDate: user.lastStudyDate || null,
           challengesAnswered,

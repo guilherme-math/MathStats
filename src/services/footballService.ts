@@ -116,3 +116,68 @@ export async function getRecentTeamMatches(teamId: number, season: number): Prom
     });
   }
 }
+
+const playerSchema = z.object({
+  player: z.object({ name: z.string().min(1) }),
+  statistics: z.array(z.unknown()),
+});
+const playerStatSchema = z.object({
+  team: z.object({ id: z.number(), name: z.string().min(1) }),
+  league: z.object({ id: z.number() }),
+  games: z.object({ appearences: z.number().int().positive() }),
+  goals: z.object({ total: z.number().int().nonnegative() }),
+});
+
+type PlayerStats = { name: string; team: string; games: number; goals: number };
+const playerCache = new Map<string, { until: number; players: PlayerStats[] }>();
+const pendingPlayers = new Map<string, Promise<PlayerStats[]>>();
+
+export async function getTeamPlayers(team: number, season: number): Promise<PlayerStats[]> {
+  const key = `${team}:${season}`;
+  const cached = playerCache.get(key);
+  if (cached && cached.until > Date.now()) return cached.players;
+  const pending = pendingPlayers.get(key);
+  if (pending) return pending;
+
+  const load = (async () => {
+    const response = await axios.get('https://v3.football.api-sports.io/players', {
+      params: { team, season, league: 71, page: 1 },
+      headers: { 'x-apisports-key': process.env.API_FOOTBALL_KEY },
+      timeout: REQUEST_TIMEOUT_MS,
+      maxContentLength: 2 * 1024 * 1024,
+    });
+    const rows = z.object({ response: z.array(z.unknown()) }).parse(response.data).response;
+    const players = rows.flatMap((row) => {
+      const entry = playerSchema.safeParse(row);
+      if (!entry.success) return [];
+      const stats = entry.data.statistics
+        .map((item) => playerStatSchema.safeParse(item))
+        .find(
+          (item) => item.success && item.data.team.id === team && item.data.league.id === 71,
+        )?.data;
+      return stats
+        ? [
+            {
+              name: entry.data.player.name,
+              team: stats.team.name,
+              games: stats.games.appearences,
+              goals: stats.goals.total,
+            },
+          ]
+        : [];
+    });
+    playerCache.set(key, {
+      until: Date.now() + (players.length ? CACHE_STALE_MS : CACHE_FRESH_MS),
+      players,
+    });
+    return players;
+  })()
+    .catch(() => {
+      playerCache.set(key, { until: Date.now() + CACHE_FRESH_MS, players: [] });
+      return [];
+    })
+    .finally(() => pendingPlayers.delete(key));
+
+  pendingPlayers.set(key, load);
+  return load;
+}

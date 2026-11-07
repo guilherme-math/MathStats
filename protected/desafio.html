@@ -37,7 +37,7 @@
           >
         </a>
         <div class="challenge-marker d-none d-md-flex" aria-label="Progresso atual">
-          <small>DESAFIO DIÁRIO</small
+          <small>PROGRESSO NA TRILHA</small
           ><strong
             ><span id="headerChallengeIndex">01</span> /
             <span id="headerChallengeTotal">05</span></strong
@@ -78,10 +78,66 @@
     </header>
 
     <main id="main" class="container-xl">
+      <section class="trail-hub" id="trailHub" hidden aria-labelledby="trailHubTitle">
+        <p class="summary-code">APRENDIZAGEM / CENTRAL DE TRILHAS</p>
+        <h1 id="trailHubTitle">Escolha sua <span>trilha</span></h1>
+        <p>Pratique no seu ritmo e acompanhe suas trilhas concluídas.</p>
+        <nav class="trail-picker" aria-label="Filtrar trilhas">
+          <button type="button" class="secondary-button" id="trailsPending" aria-pressed="true">
+            A fazer
+          </button>
+          <button type="button" class="secondary-button" id="trailsCompleted" aria-pressed="false">
+            Concluídas
+          </button>
+        </nav>
+        <p id="trailHubMessage" role="status" hidden></p>
+        <div class="trail-hub-grid" id="pendingTrailList">
+          <a class="trail-hub-card" href="/desafio?trilha=diagnostico">
+            <span class="trail-hub-number" aria-hidden="true">01</span>
+            <div class="trail-hub-copy">
+              <small>5 QUESTÕES · FLAMENGO</small>
+              <h2>Tutorial</h2>
+              <p>Conheça as dicas, a correção e o XP em cinco desafios do Flamengo.</p>
+            </div>
+            <strong class="trail-hub-cta">Começar tutorial</strong>
+          </a>
+          <a class="trail-hub-card" href="/desafio?trilha=facil">
+            <span class="trail-hub-number" aria-hidden="true">02</span>
+            <div class="trail-hub-copy">
+              <small>10 QUESTÕES · FÁCIL</small>
+              <h2>O básico do jogo</h2>
+              <p>Leia placares, some gols e calcule o saldo dos clubes.</p>
+            </div>
+            <strong class="trail-hub-cta">Praticar aritmética</strong>
+          </a>
+          <a class="trail-hub-card" href="/desafio?trilha=media">
+            <span class="trail-hub-number" aria-hidden="true">03</span>
+            <div class="trail-hub-copy">
+              <small>10 QUESTÕES · MÉDIA</small>
+              <h2>De olho na tabela</h2>
+              <p>Combine as quatro operações para resolver problemas de pontuação e desempenho.</p>
+            </div>
+            <strong class="trail-hub-cta">Praticar operações</strong>
+          </a>
+          <a class="trail-hub-card" href="/desafio?trilha=avancada">
+            <span class="trail-hub-number" aria-hidden="true">04</span>
+            <div class="trail-hub-copy">
+              <small>10 QUESTÕES · AVANÇADA</small>
+              <h2>Além do placar</h2>
+              <p>Compare médias, analise percentuais e calcule a trajetória de um chute.</p>
+            </div>
+            <strong class="trail-hub-cta">Praticar estatística e álgebra</strong>
+          </a>
+        </div>
+        <div class="trail-hub-grid" id="completedTrailList" hidden></div>
+      </section>
+      <div class="trail-picker" id="trailBreadcrumb" hidden>
+        <a href="/desafio">← Todas as trilhas</a><strong id="activeTrailName"></strong>
+      </div>
       <section class="progress-section" aria-label="Progresso da trilha">
         <div class="progress-heading">
           <div>
-            <p>TRILHA / DIÁRIA_01</p>
+            <p>TRILHA DE APRENDIZAGEM</p>
             <h2>
               DESAFIO <span id="challengeIndex">01</span> <em>/</em>
               <span id="challengeTotal">05</span>
@@ -168,10 +224,10 @@
       </article>
 
       <section class="summary-card" id="summaryCard" hidden aria-label="Resumo da trilha">
-        <p class="summary-code">SESSÃO_CONCLUÍDA / 05.05</p>
+        <p class="summary-code" id="summaryTrailLabel">SESSÃO CONCLUÍDA</p>
         <span class="summary-symbol" aria-hidden="true">Σ</span>
         <h1>TRILHA<br /><span>CONCLUÍDA</span></h1>
-        <p>Dados processados. Sua sequência diária foi concluída.</p>
+        <p id="trailRecommendation">Veja seu resultado nesta trilha.</p>
         <ul class="summary-grid">
           <li><small>XP GANHOS</small><strong id="sumXp">+0 XP</strong></li>
           <li><small>ACERTOS</small><strong id="sumCorrect">0 / 5</strong></li>
@@ -180,7 +236,7 @@
         </ul>
         <div class="summary-actions">
           <button class="action-button" type="button" id="dashboardBtn">VOLTAR AO PAINEL</button>
-          <button class="secondary-button" type="button" id="restartBtn">REFAZER TRILHA</button>
+          <a class="secondary-button" href="/desafio">ESCOLHER OUTRA TRILHA</a>
         </div>
       </section>
     </main>

@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { buildChallenge } from '../services/challengeBuilder';
+import { buildSportsPractice, isPracticeTrail } from '../services/practiceTrails';
 import { Request, Response } from 'express';
 import { db } from '../config/firebase';
 import { audit } from '../utils/auditLogger';
@@ -6,36 +8,58 @@ import type { AppSession } from '../types/session';
 import { registerStudyDay } from '../utils/streak';
 import type { Transaction } from 'firebase-admin/firestore';
 import { getRecentTeamMatches } from '../services/footballService';
+import { UserModel } from '../models/userModel';
+import {
+  isTrailId,
+  summarizeTrail,
+  trailLengths,
+  type TrailProgress,
+} from '../services/trailProgress';
 import {
   challengeAnswerSchema,
   challengeIdSchema,
   challengeIndexSchema,
+  practiceIndexSchema,
 } from '../validation/challengeSchemas';
 
 export const gerarDesafio = async (req: Request, res: Response) => {
   try {
-    const parsedIndex = challengeIndexSchema.safeParse(req.query.indice);
-    if (!parsedIndex.success) {
-      return res.status(400).json({ erro: 'O índice do desafio deve estar entre 1 e 5.' });
+    const trail = req.query.trilha ?? 'diagnostico';
+    if (trail !== 'diagnostico' && !isPracticeTrail(trail)) {
+      return res.status(400).json({ erro: 'Trilha inválida.' });
     }
-
-    const indice = parsedIndex.data;
-    const teamId = 127;
+    const total = trail === 'diagnostico' ? 5 : 10;
+    const indexSchema = trail === 'diagnostico' ? challengeIndexSchema : practiceIndexSchema;
+    const parsedIndex = indexSchema.safeParse(req.query.indice);
+    if (!parsedIndex.success) {
+      return res.status(400).json({ erro: `O índice do desafio deve estar entre 1 e ${total}.` });
+    }
     const session = req.session as AppSession;
     const userId = session.userId!;
-
-    const jogos = await getRecentTeamMatches(teamId, 2024);
-
-    if (jogos.length < 5) {
-      return res
-        .status(400)
-        .json({ erro: 'Não existem jogos finalizados suficientes para gerar a trilha.' });
+    const user = await UserModel.findById(userId);
+    if (!user) return res.status(404).json({ erro: 'Conta não encontrada.' });
+    const progress = summarizeTrail(user.trailProgress, trail);
+    if (progress.completed || progress.answered.includes(parsedIndex.data)) {
+      return res.status(409).json({ erro: 'Esta questão já foi concluída.', progresso: progress });
     }
 
-    const desafio = buildChallenge(jogos, indice);
+    let desafio;
+    if (trail === 'diagnostico') {
+      const jogos = await getRecentTeamMatches(127, 2024);
+      if (jogos.length < 5) {
+        return res.status(400).json({ erro: 'Não há partidas suficientes para o diagnóstico.' });
+      }
+      desafio = buildChallenge(jogos, parsedIndex.data);
+    } else {
+      desafio = await buildSportsPractice(trail, parsedIndex.data);
+      if (!desafio) return res.status(400).json({ erro: 'Questão inexistente nesta trilha.' });
+    }
 
     const docRef = await db.collection('challenges').add({
       userId,
+      trilha: trail,
+      indice: parsedIndex.data,
+      rodadaTrilha: user.trailRuns?.[trail] ?? null,
       tipo: desafio.tipo,
       tipoDesafio: desafio.tipoDesafio,
       categoria: desafio.categoria,
@@ -141,7 +165,12 @@ export const responderDesafio = async (req: Request<{ id: string }>, res: Respon
       let respostaUsuario: any = resposta;
 
       if (tipo === 'numeric') {
-        const numero = Number(resposta);
+        const numero =
+          typeof resposta === 'number'
+            ? resposta
+            : /^-?\d+(?:[.,]\d+)?$/.test(resposta)
+              ? Number(resposta.replace(',', '.'))
+              : NaN;
 
         if (!Number.isFinite(numero)) {
           throw Object.assign(new Error('Informe uma resposta numérica válida.'), {
@@ -149,7 +178,7 @@ export const responderDesafio = async (req: Request<{ id: string }>, res: Respon
           });
         }
 
-        const margemErro = 0.05;
+        const margemErro = desafio?.trilha && desafio.trilha !== 'diagnostico' ? 0.000001 : 0.05;
         acertou = Math.abs(numero - Number(respostaCorreta)) <= margemErro;
         respostaUsuario = numero;
       } else {
@@ -167,6 +196,34 @@ export const responderDesafio = async (req: Request<{ id: string }>, res: Respon
       const xpGanho = acertou ? (Boolean(usouDica) ? Math.floor(xpBase / 2) : xpBase) : 0;
 
       const userData = userDoc.data();
+      const trail = desafio?.trilha;
+      const position = desafio?.indice;
+      if (
+        isTrailId(trail) &&
+        (desafio?.rodadaTrilha ?? null) !== (userData?.trailRuns?.[trail] ?? null)
+      ) {
+        throw Object.assign(new Error('Esta questão pertence a uma tentativa anterior.'), {
+          statusCode: 409,
+        });
+      }
+      let trailProgress: TrailProgress | undefined;
+      let progresso;
+      if (
+        isTrailId(trail) &&
+        Number.isInteger(position) &&
+        position >= 1 &&
+        position <= trailLengths[trail]
+      ) {
+        const previous: TrailProgress = userData?.trailProgress ?? {};
+        if (summarizeTrail(previous, trail).answered.includes(position)) {
+          throw Object.assign(new Error('Esta questão já foi concluída.'), { statusCode: 409 });
+        }
+        trailProgress = {
+          ...previous,
+          [trail]: { ...previous[trail], [position]: { correct: acertou, xp: xpGanho } },
+        };
+        progresso = summarizeTrail(trailProgress, trail);
+      }
       const xpAtual = Number(userData?.xpTotal) || 0;
       const xpTotal = xpAtual + xpGanho;
       const study = registerStudyDay(
@@ -194,6 +251,7 @@ export const responderDesafio = async (req: Request<{ id: string }>, res: Respon
           challengesAnswered,
           challengesCorrect,
           lastChallengeAt: respondidoEm,
+          ...(trailProgress ? { trailProgress } : {}),
         },
         { merge: true },
       );
@@ -222,6 +280,7 @@ export const responderDesafio = async (req: Request<{ id: string }>, res: Respon
         tipoDesafio: desafio?.tipoDesafio || 'desafio',
         xpGanho,
         xpTotal,
+        progresso,
         streak: study.streak,
         lastStudyDate: study.lastStudyDate,
         streakChanged: study.changed,
@@ -247,6 +306,7 @@ export const responderDesafio = async (req: Request<{ id: string }>, res: Respon
       explicacao: resultado.explicacao,
       xpGanho: resultado.xpGanho,
       xpTotal: resultado.xpTotal,
+      progresso: resultado.progresso,
       streak: resultado.streak,
       lastStudyDate: resultado.lastStudyDate,
       streakChanged: resultado.streakChanged,
@@ -260,5 +320,34 @@ export const responderDesafio = async (req: Request<{ id: string }>, res: Respon
     return res.status(statusCode).json({
       erro: statusCode >= 500 ? 'Erro interno no servidor ao validar a resposta.' : error.message,
     });
+  }
+};
+
+export const repetirTrilha = async (req: Request, res: Response) => {
+  const trail = req.params.trilha;
+  if (!isPracticeTrail(trail))
+    return res.status(400).json({ erro: 'Somente trilhas de prática podem ser refeitas.' });
+  const userId = (req.session as AppSession).userId!;
+  const ref = db.collection('users').doc(userId);
+  try {
+    const status = await db.runTransaction(async (transaction) => {
+      const user = (await transaction.get(ref)).data();
+      if (!user) return 404;
+      if (!summarizeTrail(user.trailProgress, trail).completed) return 409;
+      const trailProgress: TrailProgress = { ...user.trailProgress };
+      delete trailProgress[trail];
+      transaction.update(ref, {
+        trailProgress,
+        trailRuns: { ...user.trailRuns, [trail]: randomUUID() },
+      });
+      return 200;
+    });
+    if (status === 404) return res.status(404).json({ erro: 'Conta não encontrada.' });
+    if (status === 409)
+      return res.status(409).json({ erro: 'Conclua a tentativa atual antes de refazer a trilha.' });
+    return res.json({ mensagem: 'Nova tentativa iniciada.' });
+  } catch (error) {
+    console.error('[trail/restart]', error);
+    return res.status(500).json({ erro: 'Não foi possível refazer a trilha agora.' });
   }
 };

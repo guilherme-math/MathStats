@@ -917,6 +917,14 @@ input.is-incorrect {
   justify-content: center;
   gap: 10px;
 }
+
+.summary-actions a.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+}
 .footer {
   border-top: 1px solid var(--border);
 }
@@ -1172,4 +1180,139 @@ input.is-incorrect {
     padding: 0 9px;
     font-size: 0.52rem;
   }
+}
+
+.trail-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-block: 16px;
+}
+
+.trail-picker a {
+  color: inherit;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.trail-picker a[aria-current='page'] {
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.trail-hub {
+  max-width: 1132px;
+  margin-inline: auto;
+  padding-block: clamp(32px, 6vw, 64px);
+}
+
+.trail-hub h1 {
+  font:
+    700 clamp(2.2rem, 6vw, 4.5rem) / 1.04 'Sora',
+    sans-serif;
+  letter-spacing: -0.055em;
+  margin-block: 10px 14px;
+}
+
+.trail-hub h1 span {
+  color: var(--accent-bright);
+}
+
+.trail-hub > p:not(.summary-code) {
+  color: var(--text-secondary);
+}
+
+.trail-hub-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 28px;
+  padding: clamp(14px, 3vw, 28px);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.trail-hub-card {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(12px, 3vw, 28px);
+  min-height: 136px;
+  color: var(--text-primary);
+  background: linear-gradient(115deg, var(--accent-soft), transparent 56%), var(--bg-elevated);
+  border: 1px solid var(--accent-line);
+  padding: clamp(18px, 3vw, 28px);
+  text-decoration: none;
+}
+
+.trail-hub-card:hover,
+.trail-hub-card:focus-visible {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.trail-hub-number {
+  color: transparent;
+  font:
+    700 clamp(2rem, 6vw, 3.8rem) / 1 'Sora',
+    sans-serif;
+  -webkit-text-stroke: 1px var(--accent-bright);
+}
+
+.trail-hub-copy small {
+  color: var(--accent-bright);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.trail-hub-card h2 {
+  font:
+    700 clamp(1rem, 3vw, 1.4rem) 'Sora',
+    sans-serif;
+  margin-block: 6px 7px;
+}
+
+.trail-hub-card p {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.trail-hub-cta {
+  display: grid;
+  place-items: center;
+  min-height: 46px;
+  padding: 8px 16px;
+  border-radius: 5px;
+  color: var(--on-accent);
+  background: var(--accent);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+button.trail-hub-cta {
+  border: 0;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+@media (max-width: 700px) {
+  .trail-hub-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .trail-hub-cta {
+    grid-column: 1 / -1;
+  }
+}
+
+.trail-picker button[aria-pressed='true'] {
+  color: var(--accent-bright);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }

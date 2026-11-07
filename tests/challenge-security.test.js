@@ -17,25 +17,25 @@ const {
 const { normalizeRecentMatches } = require('../dist/services/footballService');
 const { getRecentTeamMatches } = require('../dist/services/footballService');
 
-test('limite de geração bloqueia a vigésima primeira requisição', async () => {
+test('limite de geração bloqueia a quadragésima primeira requisição', async () => {
   const app = express();
   app.set('trust proxy', 1);
   app.use(challengeGenerationLimiter);
   app.get('/desafio', (_req, res) => res.json({ ok: true }));
 
-  for (let attempt = 1; attempt <= 20; attempt += 1) {
+  for (let attempt = 1; attempt <= 40; attempt += 1) {
     assert.equal((await request(app).get('/desafio')).status, 200);
   }
   assert.equal((await request(app).get('/desafio')).status, 429);
 });
 
-test('limite de respostas bloqueia a trigésima primeira requisição', async () => {
+test('limite de respostas bloqueia a quadragésima primeira requisição', async () => {
   const app = express();
   app.set('trust proxy', 1);
   app.use(challengeAnswerLimiter);
   app.post('/responder', (_req, res) => res.json({ ok: true }));
 
-  for (let attempt = 1; attempt <= 30; attempt += 1) {
+  for (let attempt = 1; attempt <= 40; attempt += 1) {
     assert.equal((await request(app).post('/responder')).status, 200);
   }
   assert.equal((await request(app).post('/responder')).status, 429);

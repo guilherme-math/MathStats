@@ -156,7 +156,7 @@ export const challengeGenerationLimiter = rateLimit({
   store:
     process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('challenge-create'),
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 40,
   standardHeaders: true,
   legacyHeaders: false,
   message: { erro: 'Limite de geração de desafios atingido. Aguarde 15 minutos.' },
@@ -166,7 +166,7 @@ export const challengeAnswerLimiter = rateLimit({
   store:
     process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('challenge-answer'),
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: 40,
   standardHeaders: true,
   legacyHeaders: false,
   message: { erro: 'Limite de respostas atingido. Aguarde 15 minutos.' },

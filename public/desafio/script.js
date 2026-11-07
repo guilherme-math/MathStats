@@ -2,7 +2,16 @@
   'use strict';
 
   const API_BASE = '/api';
-  var TOTAL_CHALLENGES = 5;
+  var requestedTrail = new URLSearchParams(window.location.search).get('trilha');
+  var trailLabels = {
+    diagnostico: 'Tutorial',
+    facil: 'Fácil',
+    media: 'Média',
+    avancada: 'Avançada',
+  };
+  var trail = Object.hasOwn(trailLabels, requestedTrail) ? requestedTrail : null;
+  var TOTAL_CHALLENGES = trail === 'diagnostico' ? 5 : 10;
+  var trailProgress = {};
   var state = {
     index: 0,
     xp: 0,
@@ -113,10 +122,12 @@
         return {};
       });
       if (!response.ok) return;
+      trailProgress = (data.user && data.user.trilhas) || {};
       state.xp = Number(data.user && data.user.xpTotal) || 0;
       state.streak = Number(data.user && data.user.streak) || 0;
       el('xpValue').textContent = formatNumber(state.xp);
       if (el('streakValue')) el('streakValue').textContent = String(state.streak);
+      return true;
     } catch (error) {}
   }
 
@@ -226,14 +237,24 @@
   async function loadChallenge() {
     setLoading();
     try {
-      var response = await fetch(API_BASE + '/desafio?indice=' + (state.index + 1), {
-        headers: { Accept: 'application/json' },
-      });
+      var response = await fetch(
+        API_BASE + '/desafio?trilha=' + trail + '&indice=' + (state.index + 1),
+        {
+          headers: { Accept: 'application/json' },
+        },
+      );
       var data = await response.json().catch(function () {
         return {};
       });
       if (response.status === 401) {
         window.location.href = '/login';
+        return;
+      }
+      if (response.status === 409 && data.progresso) {
+        window.location.replace(
+          '/desafio' +
+            (data.progresso.completed && trail !== 'diagnostico' ? '?aba=concluidas' : ''),
+        );
         return;
       }
       if (!response.ok || !(data.pergunta || data.question))
@@ -300,9 +321,17 @@
     input.inputMode = 'decimal';
     input.autocomplete = 'off';
     input.placeholder = challenge.placeholder;
+    input.maxLength = 24;
+    var lastValue = '';
     input.addEventListener('input', function () {
+      if (!/^-?\d*(?:[.,]\d*)?$/.test(input.value)) {
+        input.value = lastValue;
+        el('fieldMessage').textContent = 'Use apenas números, sinal negativo e separador decimal.';
+        return;
+      }
+      lastValue = input.value;
       state.selected = input.value;
-      checkBtn.disabled = !input.value.trim();
+      checkBtn.disabled = !/^-?\d+(?:[.,]\d+)?$/.test(input.value);
       el('fieldMessage').textContent = '';
     });
     answerArea.append(label, input);
@@ -442,7 +471,7 @@
   }
 
   function updateProgress() {
-    var completed = state.locked ? state.index + 1 : state.index;
+    var completed = (trailProgress[trail] || { answered: [] }).answered.length;
     var percent = Math.round((completed / TOTAL_CHALLENGES) * 100);
     el('challengeIndex').textContent = pad(state.index + 1);
     el('challengeTotal').textContent = pad(TOTAL_CHALLENGES);
@@ -513,10 +542,13 @@
       el('answer').classList.add(correct ? 'is-correct' : 'is-incorrect');
     else if (challenge.type !== 'order')
       answerArea.querySelectorAll('.option-btn').forEach(function (button) {
-        if (button.dataset.value === String(state.selected))
-          button.classList.add(correct ? 'is-correct' : 'is-incorrect');
+        if (button.dataset.value === String(result.respostaCorreta))
+          button.classList.add('is-correct');
+        else if (button.dataset.value === String(state.selected))
+          button.classList.add('is-incorrect');
         button.setAttribute('aria-disabled', 'true');
       });
+    if (result.progresso) trailProgress[trail] = result.progresso;
     state.locked = true;
     updateProgress();
     fieldset.disabled = true;
@@ -535,7 +567,12 @@
     var xpEarned = Number(result.xpGanho) || 0;
     var xpTotal = Number(result.xpTotal);
     var streak = Number(result.streak);
-    el('feedbackText').textContent = translateVisibleText(explanation);
+    el('feedbackText').textContent =
+      (!correct && result.respostaCorreta != null
+        ? 'Resposta correta: ' +
+          String(result.respostaCorreta).replace(/^(\d+)\.(\d+)$/, '$1,$2') +
+          '. '
+        : '') + translateVisibleText(explanation);
     el('xpBurst').hidden = xpEarned <= 0;
     el('xpBurst').textContent = '+' + xpEarned + ' XP';
     if (Number.isFinite(streak)) {
@@ -543,9 +580,11 @@
       if (el('streakValue')) el('streakValue').textContent = String(state.streak);
       if (result.streakChanged) el('streakChip').classList.add('chip-glow');
     }
+    if (result.progresso) {
+      state.correct = result.progresso.correct;
+      state.xpGained = result.progresso.xp;
+    }
     if (correct) {
-      state.correct += 1;
-      state.xpGained += xpEarned;
       if (Number.isFinite(xpTotal)) state.xp = xpTotal;
       el('xpValue').textContent = formatNumber(state.xp);
       el('xpChip').classList.add('chip-pop');
@@ -553,7 +592,7 @@
       el('challengeCard').classList.add('shake');
     }
     el('nextBtn').innerHTML =
-      (state.index === TOTAL_CHALLENGES - 1 ? 'CONCLUIR TRILHA' : 'CONTINUAR') + ' <span>→</span>';
+      (trailProgress[trail]?.completed ? 'CONCLUIR TRILHA' : 'CONTINUAR') + ' <span>→</span>';
     el('nextBtn').focus();
   }
 
@@ -589,6 +628,10 @@
         window.location.href = '/login';
         return;
       }
+      if (response.status === 409) {
+        window.location.reload();
+        return;
+      }
       if (!response.ok) throw new Error(result.erro || 'Não foi possível validar a resposta.');
       markAnswer(Boolean(result.acertou), result);
     } catch (error) {
@@ -612,21 +655,11 @@
     el('progressFill').style.width = '100%';
     el('solvedLabel').textContent = TOTAL_CHALLENGES + ' CONCLUÍDOS';
     el('xpAvailable').textContent = 'TRILHA CONCLUÍDA';
-  }
-
-  function restart() {
-    state.index = 0;
-    state.correct = 0;
-    state.xpGained = 0;
-    state.locked = false;
-    state.hintUses = 0;
-    state.hintUsedCurrentChallenge = false;
-    state.currentHintIndex = 0;
-    el('summaryCard').hidden = true;
-    el('challengeCard').hidden = false;
-    updateProgress();
-    loadChallenge();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    el('summaryTrailLabel').textContent =
+      trailLabels[trail] + ' · ' + TOTAL_CHALLENGES + ' questões';
+    if (trail === 'diagnostico')
+      el('trailRecommendation').textContent =
+        'Tutorial concluído. Agora você pode escolher uma trilha de prática.';
   }
 
   form.addEventListener('submit', function (event) {
@@ -635,9 +668,10 @@
   });
   el('nextBtn').addEventListener('click', function () {
     el('challengeCard').classList.remove('shake');
-    if (state.index === TOTAL_CHALLENGES - 1) showSummary();
-    else {
-      state.index += 1;
+    var progress = trailProgress[trail];
+    if (progress?.completed) showSummary();
+    else if (progress?.next) {
+      state.index = progress.next - 1;
       loadChallenge();
     }
   });
@@ -670,7 +704,7 @@
   el('themeToggle').addEventListener('click', function () {
     setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   });
-  el('restartBtn').addEventListener('click', restart);
+
   el('dashboardBtn').addEventListener('click', function () {
     window.location.href = '/dashboard';
   });
@@ -685,7 +719,103 @@
     savedTheme = localStorage.getItem('mathstats-theme') || 'dark';
   } catch (error) {}
   setTheme(savedTheme === 'light' ? 'light' : 'dark');
-  updateProgress();
-  loadUserXp();
-  loadChallenge();
+  async function openTrails() {
+    var loaded = await loadUserXp();
+    if (trail && loaded) {
+      var progress = trailProgress[trail];
+      if (progress?.completed) {
+        window.location.replace('/desafio' + (trail === 'diagnostico' ? '' : '?aba=concluidas'));
+        return;
+      }
+      if (progress) {
+        state.index = (progress.next || 1) - 1;
+        state.correct = progress.correct;
+        state.xpGained = progress.xp;
+      }
+      el('trailBreadcrumb').hidden = false;
+      el('activeTrailName').textContent = trailLabels[trail];
+      updateProgress();
+      loadChallenge();
+      return;
+    }
+
+    el('trailHub').hidden = false;
+    el('challengeCard').hidden = true;
+    document.querySelector('.progress-section').hidden = true;
+    el('headerChallengeIndex').parentElement.parentElement.hidden = true;
+    var pending = el('pendingTrailList');
+    var completed = el('completedTrailList');
+    var message = el('trailHubMessage');
+    if (!loaded) {
+      pending.hidden = true;
+      message.hidden = false;
+      message.textContent =
+        'Não foi possível carregar seu progresso. Recarregue a página para tentar novamente.';
+      return;
+    }
+    pending.querySelectorAll('a.trail-hub-card').forEach(function (card) {
+      var id = new URL(card.href).searchParams.get('trilha');
+      var progress = trailProgress[id];
+      if (progress?.completed) {
+        if (id !== 'diagnostico') {
+          var item = document.createElement('article');
+          item.className = card.className;
+          item.append(...card.children);
+          var stats = document.createElement('p');
+          stats.textContent = progress.correct + '/10 acertos · ' + progress.xp + ' XP';
+          item.querySelector('.trail-hub-copy').appendChild(stats);
+          var restart = document.createElement('button');
+          restart.type = 'button';
+          restart.className = 'trail-hub-cta';
+          restart.textContent = 'Refazer trilha';
+          item.querySelector('.trail-hub-cta').replaceWith(restart);
+          restart.addEventListener('click', async function () {
+            restart.disabled = true;
+            try {
+              var response = await fetch(API_BASE + '/trilhas/' + id + '/repetir', {
+                method: 'POST',
+              });
+              if (response.status === 401) {
+                window.location.href = '/login';
+                return;
+              }
+              if (!response.ok) {
+                var result = await response.json();
+                throw new Error(result.erro || 'Não foi possível refazer a trilha.');
+              }
+              window.location.href = '/desafio?trilha=' + id;
+            } catch (error) {
+              message.textContent = error.message;
+              message.hidden = false;
+              restart.disabled = false;
+            }
+          });
+          completed.appendChild(item);
+        }
+        card.remove();
+      } else if (progress?.answered.length) {
+        card.querySelector('.trail-hub-cta').textContent =
+          'Continuar · ' + progress.answered.length + ' respondidas';
+      }
+    });
+    function showTab(showCompleted) {
+      var list = showCompleted ? completed : pending;
+      pending.hidden = showCompleted || !pending.childElementCount;
+      completed.hidden = !showCompleted || !completed.childElementCount;
+      el('trailsPending').setAttribute('aria-pressed', String(!showCompleted));
+      el('trailsCompleted').setAttribute('aria-pressed', String(showCompleted));
+      message.hidden = Boolean(list.childElementCount);
+      message.textContent = showCompleted
+        ? 'Você ainda não concluiu uma trilha de prática.'
+        : 'Você concluiu todas as trilhas disponíveis.';
+    }
+    el('trailsPending').addEventListener('click', function () {
+      showTab(false);
+    });
+    el('trailsCompleted').addEventListener('click', function () {
+      showTab(true);
+    });
+    showTab(new URLSearchParams(window.location.search).get('aba') === 'concluidas');
+  }
+  openTrails();
 })();

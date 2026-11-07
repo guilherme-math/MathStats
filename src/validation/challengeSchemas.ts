@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+export const practiceIndexSchema = z.coerce.number().int().min(1).max(10).default(1);
 export const challengeIndexSchema = z.coerce.number().int().min(1).max(5).default(1);
 
 export const challengeIdSchema = z.string().regex(/^[A-Za-z0-9]{20}$/);
