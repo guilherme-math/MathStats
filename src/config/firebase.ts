@@ -3,6 +3,7 @@ import path from 'path';
 import { cert, getApps, initializeApp, type ServiceAccount } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { withCollectionPrefix } from './firestoreNamespace';
 
 function loadCredential(): ServiceAccount {
   const base64Json = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
@@ -35,5 +36,5 @@ if (!getApps().length) {
   });
 }
 
-export const db = getFirestore();
+export const db = withCollectionPrefix(getFirestore(), process.env.FIRESTORE_COLLECTION_PREFIX);
 export const auth = getAuth();

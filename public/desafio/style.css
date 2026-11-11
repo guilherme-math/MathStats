@@ -211,6 +211,11 @@ a {
   align-items: center;
   gap: 8px;
 }
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .stat-chip {
   height: 42px;
   min-width: 78px;
@@ -1167,15 +1172,24 @@ input.is-incorrect {
   cursor: pointer;
 }
 .top-link:hover,
+.top-link[aria-current='page'],
 .logout-button:hover {
   border-color: var(--accent);
   color: var(--accent-bright);
   background: var(--accent-soft);
 }
-@media (max-width: 767px) {
-  .top-link {
-    display: none;
+@media (max-width: 991px) {
+  .topbar-inner {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding-block: 10px;
   }
+  .topbar-nav {
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 767px) {
   .logout-button {
     padding: 0 9px;
     font-size: 0.52rem;

@@ -7,9 +7,11 @@ import type {
 } from 'firebase-admin/firestore';
 import { DEFAULT_USER_ROLE, normalizeUserRole, type UserRole } from '../config/userRoles';
 import type { TrailId, TrailProgress } from '../services/trailProgress';
+import { deleteClassData } from '../services/classPrivacy';
 
 export interface User {
   id: string;
+  deleting?: boolean;
   displayName?: string;
   username: string;
   usernameNormalized?: string;
@@ -163,6 +165,7 @@ export const UserModel = {
     termsVersion: string;
     privacyPolicyVersion: string;
     googleId?: string;
+    role?: UserRole;
   }): Promise<User> => {
     const displayName = data.displayName.trim();
     const username = normalizeUsername(data.username);
@@ -176,7 +179,7 @@ export const UserModel = {
       usernameNormalized: username,
       email,
       emailNormalized: email,
-      role: DEFAULT_USER_ROLE,
+      role: normalizeUserRole(data.role),
       xpTotal: 0,
       streak: 0,
       lastStudyDate: null,
@@ -193,7 +196,7 @@ export const UserModel = {
       usernameNormalized: username,
       email,
       emailNormalized: email,
-      role: DEFAULT_USER_ROLE,
+      role: normalizeUserRole(data.role),
       xpTotal: 0,
       streak: 0,
       lastStudyDate: null,
@@ -340,6 +343,8 @@ export const UserModel = {
 
   deleteUser: async (id: string): Promise<void> => {
     const userRef = usersCollection.doc(id);
+    await userRef.update({ deleting: true });
+    await deleteClassData(id);
     const ownedRecords = [
       userRef.collection('attempts'),
       userRef.collection('privacyRequests'),

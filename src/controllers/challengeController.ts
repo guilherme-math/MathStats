@@ -38,6 +38,9 @@ export const gerarDesafio = async (req: Request, res: Response) => {
     const userId = session.userId!;
     const user = await UserModel.findById(userId);
     if (!user) return res.status(404).json({ erro: 'Conta não encontrada.' });
+    if (trail !== 'diagnostico' && !summarizeTrail(user.trailProgress, 'diagnostico').completed) {
+      return res.status(403).json({ erro: 'Conclua o tutorial para liberar as trilhas.' });
+    }
     const progress = summarizeTrail(user.trailProgress, trail);
     if (progress.completed || progress.answered.includes(parsedIndex.data)) {
       return res.status(409).json({ erro: 'Esta questão já foi concluída.', progresso: progress });
@@ -215,6 +218,11 @@ export const responderDesafio = async (req: Request<{ id: string }>, res: Respon
         position <= trailLengths[trail]
       ) {
         const previous: TrailProgress = userData?.trailProgress ?? {};
+        if (trail !== 'diagnostico' && !summarizeTrail(previous, 'diagnostico').completed) {
+          throw Object.assign(new Error('Conclua o tutorial para liberar as trilhas.'), {
+            statusCode: 403,
+          });
+        }
         if (summarizeTrail(previous, trail).answered.includes(position)) {
           throw Object.assign(new Error('Esta questão já foi concluída.'), { statusCode: 409 });
         }
@@ -333,6 +341,7 @@ export const repetirTrilha = async (req: Request, res: Response) => {
     const status = await db.runTransaction(async (transaction) => {
       const user = (await transaction.get(ref)).data();
       if (!user) return 404;
+      if (!summarizeTrail(user.trailProgress, 'diagnostico').completed) return 403;
       if (!summarizeTrail(user.trailProgress, trail).completed) return 409;
       const trailProgress: TrailProgress = { ...user.trailProgress };
       delete trailProgress[trail];
@@ -343,6 +352,8 @@ export const repetirTrilha = async (req: Request, res: Response) => {
       return 200;
     });
     if (status === 404) return res.status(404).json({ erro: 'Conta não encontrada.' });
+    if (status === 403)
+      return res.status(403).json({ erro: 'Conclua o tutorial para liberar as trilhas.' });
     if (status === 409)
       return res.status(409).json({ erro: 'Conclua a tentativa atual antes de refazer a trilha.' });
     return res.json({ mensagem: 'Nova tentativa iniciada.' });

@@ -9,7 +9,7 @@ export async function validateSession(req: Request, res: Response, next: NextFun
   if (!session.userId) return next();
   try {
     const user = await UserModel.findById(session.userId);
-    if (user && session.credentialFingerprint === credentialFingerprint(user)) {
+    if (user && !user.deleting && session.credentialFingerprint === credentialFingerprint(user)) {
       session.role = user.role;
       return next();
     }

@@ -260,13 +260,7 @@ export function buildPracticeChallenge(
   };
 }
 
-const clubs = [
-  { id: 127, name: 'Flamengo' },
-  { id: 121, name: 'Palmeiras' },
-  { id: 131, name: 'Corinthians' },
-  { id: 126, name: 'São Paulo' },
-  { id: 124, name: 'Fluminense' },
-] as const;
+import { footballTeams as clubs } from '../config/footballTeams';
 
 function choices(answer: number, step = 1) {
   const values = [answer, answer + step, answer + 2 * step, answer + 3 * step].map((value) =>

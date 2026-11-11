@@ -1,0 +1,267 @@
+body[data-page='classes'] {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+body[data-page='classes'] > header,
+body[data-page='classes'] > footer {
+  flex-shrink: 0;
+}
+.class-shell {
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: 1150px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+.class-shell h1 {
+  font:
+    800 clamp(2.4rem, 6vw, 4rem) / 1.12 'Sora',
+    sans-serif;
+  letter-spacing: -0.045em;
+  margin: 16px 0;
+}
+.class-shell h2,
+.class-shell h3 {
+  font-family: 'Sora', sans-serif;
+}
+.class-shell h2 {
+  margin: 24px 0 12px;
+}
+.class-shell p,
+.class-shell small {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.class-panel,
+.class-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  padding: 24px;
+  margin: 20px 0;
+}
+.class-card {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.class-card h3 {
+  margin: 0;
+}
+.class-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+  align-items: center;
+}
+.class-row input {
+  flex: 1;
+  min-width: 180px;
+}
+.class-shell input,
+.class-shell select,
+.class-shell textarea,
+#signupRole {
+  box-sizing: border-box;
+  width: 100%;
+  background: var(--input-bg, #151e19);
+  color: var(--text-primary, #edf5f1);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 13px;
+  font: inherit;
+}
+.class-shell textarea {
+  min-height: 85px;
+  resize: vertical;
+}
+.class-shell label {
+  display: block;
+  margin: 16px 0 8px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.class-shell input:focus,
+.class-shell textarea:focus,
+.class-shell select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.class-shell button {
+  cursor: pointer;
+}
+.class-shell button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.class-question {
+  min-inline-size: 0;
+  border: 1px solid var(--border);
+  padding: 16px;
+  margin-top: 24px;
+  padding-top: 12px;
+}
+body[data-page='classes'] .auth-topbar-inner > button {
+  flex: 0 0 auto;
+  width: auto;
+}
+body[data-page='classes'] .brand {
+  flex-shrink: 0;
+}
+body[data-page='classes'] .dashboard-nav {
+  display: flex;
+  flex-wrap: wrap;
+}
+@media (max-width: 767px) {
+  body[data-page='classes'] .auth-topbar-inner {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  body[data-page='classes'] .dashboard-nav {
+    order: 1;
+    flex: 1 0 100%;
+  }
+}
+.class-row > .primary-button,
+.class-row > .secondary-button {
+  width: auto;
+}
+.class-footer {
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+.teacher-welcome {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.teacher-welcome h2 {
+  margin-top: 8px;
+}
+.football-builder {
+  min-width: 0;
+  margin-top: 24px;
+  padding: 22px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+}
+.football-builder summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.football-builder + .class-row {
+  margin-top: 18px;
+}
+.football-selectors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+  margin-bottom: 18px;
+}
+.football-selectors > div {
+  min-width: 0;
+}
+.football-data {
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+.football-data table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.football-data th,
+.football-data td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.football-data th {
+  color: var(--accent-bright);
+}
+@media (max-width: 600px) {
+  .football-selectors {
+    grid-template-columns: 1fr;
+  }
+  .football-builder {
+    padding: 14px;
+  }
+}
+.class-shell .class-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+}
+.class-option input {
+  width: auto;
+  accent-color: var(--accent);
+}
+.class-result {
+  border-left: 3px solid var(--accent);
+  padding: 10px 16px;
+  margin-top: 16px;
+}
+.class-result.is-wrong {
+  border-color: #e36e78;
+}
+#classFeedback {
+  min-height: 24px;
+}
+#classFeedback.is-error {
+  color: #ff8590;
+}
+.class-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 20px 0;
+}
+.class-metrics div {
+  flex: 1;
+  min-width: 150px;
+  padding: 18px;
+  border: 1px solid var(--border);
+}
+.class-metrics strong {
+  display: block;
+  font:
+    700 1.7rem 'Sora',
+    sans-serif;
+  color: var(--accent);
+}
+@media (max-width: 600px) {
+  .class-shell {
+    padding: 28px 16px 50px;
+  }
+  .class-panel {
+    padding: 18px;
+  }
+  .class-row > button {
+    width: 100%;
+  }
+  .dashboard-topbar-inner {
+    flex-wrap: wrap;
+  }
+}

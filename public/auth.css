@@ -801,7 +801,9 @@ button:disabled {
   }
 }
 
-body:not([data-page='dashboard']):not([data-page='account']):not([data-page='legal']) {
+body:not([data-page='dashboard']):not([data-page='account']):not([data-page='legal']):not(
+    [data-page='classes']
+  ) {
   height: 100dvh;
   min-height: 100dvh;
   display: grid;
@@ -884,6 +886,129 @@ body:not([data-page='dashboard']):not([data-page='account']):not([data-page='leg
 .consent-inline {
   margin-top: 9px;
 }
+.signup-mfa-option {
+  margin: 18px 0;
+}
+.register-role-picker {
+  width: 100%;
+  max-width: 850px;
+  margin: auto;
+  text-align: center;
+}
+.register-role-picker h1 {
+  margin: 16px 0;
+  font:
+    800 clamp(2.3rem, 5vw, 4rem) / 1.12 'Sora',
+    sans-serif;
+  letter-spacing: -0.045em;
+}
+.register-role-picker h1 span {
+  color: var(--accent-bright);
+}
+.register-role-picker > p:not(.eyebrow) {
+  color: var(--text-secondary);
+}
+.register-role-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin: 32px 0 24px;
+}
+.register-role-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 30px 24px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    transform 0.2s;
+}
+.register-role-card:hover {
+  background: var(--bg-elevated);
+  border-color: var(--accent-bright);
+  transform: translateY(-3px);
+}
+.register-role-card:focus-visible,
+.register-change-role:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 5px;
+}
+.register-role-card img {
+  object-fit: contain;
+  width: 128px;
+  height: 128px;
+}
+[data-theme='dark'] .register-role-card img {
+  filter: invert(1);
+}
+.register-role-card strong {
+  font:
+    700 1.45rem 'Sora',
+    sans-serif;
+}
+.register-role-card > span:not(.role-card-action) {
+  max-width: 270px;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+.register-role-card .role-card-action {
+  margin-top: auto;
+  padding-top: 12px;
+  color: var(--accent-bright);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.role-picker-login,
+.register-change-role {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+.register-change-role {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0 0 14px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+#registerDetails[hidden],
+#registerRolePicker[hidden] {
+  display: none;
+}
+@media (max-width: 540px) {
+  .register-role-options {
+    gap: 16px;
+    grid-template-columns: 1fr;
+  }
+  .register-role-card {
+    padding: 22px;
+    gap: 10px;
+  }
+  .register-role-card img {
+    width: 90px;
+    height: 90px;
+  }
+}
+.field select {
+  width: 100%;
+  padding: 13px;
+  margin-bottom: 14px;
+  background: var(--input-bg, #151e19);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+}
 .terms-box {
   margin-bottom: 9px;
 }
@@ -892,6 +1017,16 @@ body:not([data-page='dashboard']):not([data-page='account']):not([data-page='leg
 }
 .terms-content {
   max-height: 155px;
+}
+.terms-content a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.legal-review-status {
+  margin: 0 0 9px;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  line-height: 1.4;
 }
 .google-register-section {
   margin-top: 13px;
@@ -1001,7 +1136,9 @@ body[data-page='register'] .auth-shell {
 }
 
 @media (max-width: 900px) {
-  body:not([data-page='dashboard']):not([data-page='account']):not([data-page='legal']) {
+  body:not([data-page='dashboard']):not([data-page='account']):not([data-page='legal']):not(
+      [data-page='classes']
+    ) {
     height: auto;
     min-height: 100vh;
     display: block;
@@ -1056,7 +1193,9 @@ body[data-page='register'] .auth-shell {
   }
 }
 @media (max-height: 760px) and (min-width: 901px) {
-  body:not([data-page='dashboard']):not([data-page='account']):not([data-page='legal']) {
+  body:not([data-page='dashboard']):not([data-page='account']):not([data-page='legal']):not(
+      [data-page='classes']
+    ) {
     height: auto;
     min-height: 100vh;
     overflow: auto;

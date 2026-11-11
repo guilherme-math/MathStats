@@ -148,6 +148,7 @@ export const AuthController = {
         passwordHash,
         twoFactorSecret: mfaSecret ? encryptAES(mfaSecret.base32) : '',
         mfaEnabled,
+        role: req.body.role ?? 'aluno',
         legalAcceptedAt: new Date(),
         ...LEGAL_DOCUMENTS,
       });
@@ -582,6 +583,7 @@ export const AuthController = {
         legalAcceptedAt: new Date(),
         ...LEGAL_DOCUMENTS,
         googleId,
+        role: req.body.role ?? 'aluno',
       });
 
       await audit({

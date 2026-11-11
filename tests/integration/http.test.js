@@ -79,6 +79,7 @@ before(async () => {
   app.post('/api/verify-token', AuthController.verifyToken);
   app.use('/api', require('../../dist/routes/challengeRoutes').default);
   app.use('/api', require('../../dist/routes/dashboardRoutes').default);
+  app.use('/api', require('../../dist/routes/classRoutes').default);
   server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   client = request(`http://127.0.0.1:${server.address().port}`);
@@ -259,7 +260,19 @@ test('excluirConta_removeDesafiosDoTitularSemAfetarOutraConta', async () => {
   assert.equal(await UserModel.findById(user.id), null);
 });
 
+async function seedCompletedTutorial() {
+  await db
+    .collection('users')
+    .doc(user.id)
+    .update({
+      'trailProgress.diagnostico': Object.fromEntries(
+        [1, 2, 3, 4, 5].map((position) => [position, { correct: true, xp: 20 }]),
+      ),
+    });
+}
+
 test('trilha avançada gera a décima questão, corrige a resposta e recusa a décima primeira', async () => {
+  await seedCompletedTutorial();
   const route = '/api/desafio?trilha=avancada&indice=';
   const question = await client.get(route + '10').set('Cookie', cookie);
   assert.equal(question.status, 200);
@@ -279,6 +292,7 @@ test('trilha avançada gera a décima questão, corrige a resposta e recusa a d�
 });
 
 test('trilhas apresentam tabelas de partidas e jogadores sem expor o gabarito', async () => {
+  await seedCompletedTutorial();
   const fixtures = await client.get('/api/desafio?trilha=facil&indice=1').set('Cookie', cookie);
   assert.equal(fixtures.status, 200);
   assert.equal(fixtures.body.tabela.rows.length, 5);
@@ -333,6 +347,7 @@ test('2FA pode ser desativado e reativado com confirmação do autenticador', as
 });
 
 test('resposta numérica rejeita texto e aceita vírgula decimal', async () => {
+  await seedCompletedTutorial();
   const question = await client.get('/api/desafio?trilha=avancada&indice=6').set('Cookie', cookie);
   assert.equal(question.status, 200);
   const url = '/api/desafio/' + question.body.idDesafio + '/responder';
@@ -393,13 +408,20 @@ test('desativação por e-mail exige código próprio da sessão e consome o có
 });
 
 test('tutorial e trilhas registram posições únicas e bloqueiam a reabertura após concluir', async () => {
-  const old = await client.get('/api/desafio?trilha=facil&indice=1').set('Cookie', cookie);
-  assert.equal(old.status, 200);
+  let old;
+  const beforeTutorial = await client
+    .get('/api/desafio?trilha=avancada&indice=1')
+    .set('Cookie', cookie);
+  assert.equal(beforeTutorial.status, 403);
   for (const [trilha, total] of [
     ['diagnostico', 5],
     ['facil', 10],
   ]) {
     const route = '/api/desafio?trilha=' + trilha + '&indice=';
+    if (trilha === 'facil') {
+      old = await client.get(route + '1').set('Cookie', cookie);
+      assert.equal(old.status, 200);
+    }
     for (let index = 1; index <= total; index++) {
       const question = await client.get(route + index).set('Cookie', cookie);
       assert.equal(question.status, 200);
@@ -411,6 +433,10 @@ test('tutorial e trilhas registram posições únicas e bloqueiam a reabertura a
       assert.equal(answer.body.progresso.answered.length, index);
       assert.equal(answer.body.progresso.completed, index === total);
       assert.equal(answer.body.progresso.next, index === total ? null : index + 1);
+      if (trilha === 'diagnostico' && index === total - 1) {
+        const locked = await client.get('/api/desafio?trilha=facil&indice=1').set('Cookie', cookie);
+        assert.equal(locked.status, 403);
+      }
     }
     const retry = await client.get(route + '1').set('Cookie', cookie);
     assert.equal(retry.status, 409);
@@ -436,4 +462,224 @@ test('tutorial e trilhas registram posições únicas e bloqueiam a reabertura a
   assert.equal(current.body.user.trilhas.facil.next, 1);
   assert.equal(current.body.user.xpTotal, dashboard.body.user.xpTotal);
   assert.equal(current.body.user.challengesAnswered, dashboard.body.user.challengesAnswered);
+});
+
+async function classroomAccount(role) {
+  const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
+  const username = `turma_${suffix}`;
+  const signup = await client.post('/api/signup').send({
+    displayName: 'Conta turma',
+    username,
+    email: `${suffix}@example.invalid`,
+    password: 'Integracao@123',
+    lgpdAccepted: true,
+    enableMfa: false,
+    role,
+  });
+  assert.equal(signup.status, 201);
+  const account = await UserModel.findByUsername(username);
+  assert.equal(account.role, role);
+  const login = await client.post('/api/login').send({ username, password: 'Integracao@123' });
+  assert.equal(login.status, 200);
+  return { account, cookie: login.headers['set-cookie'][0].split(';')[0] };
+}
+
+test('turmas: criação, convite, publicação, correção e isolamento entre contas', async () => {
+  const teacher = await classroomAccount('professor');
+  const other = await classroomAccount('professor');
+  const student = await classroomAccount('aluno');
+  const created = await client
+    .post('/api/classes')
+    .set('Cookie', teacher.cookie)
+    .send({ name: 'Matemática em campo' });
+  assert.equal(created.status, 201);
+  const base = '/api/classes/' + created.body.id;
+  const classroom = await client.get(base).set('Cookie', teacher.cookie);
+  assert.match(classroom.body.inviteCode, /^[a-f0-9]{32}$/);
+  assert.equal((await client.get(base).set('Cookie', other.cookie)).status, 403);
+  assert.equal((await client.get(base).set('Cookie', student.cookie)).status, 403);
+  assert.equal(
+    (
+      await client
+        .post('/api/classes')
+        .set('Cookie', student.cookie)
+        .send({ name: 'Não permitido' })
+    ).status,
+    403,
+  );
+  const join = () =>
+    client
+      .post('/api/classes/join')
+      .set('Cookie', student.cookie)
+      .send({ code: classroom.body.inviteCode });
+  assert.equal((await join()).status, 200);
+  assert.equal((await join()).status, 200);
+  const joined = await client.get(base).set('Cookie', student.cookie);
+  assert.equal(joined.body.students, 1);
+  assert.equal(joined.body.inviteCode, undefined);
+  const questions = [
+    {
+      type: 'numeric',
+      prompt: 'Média de 3 gols em 2 jogos?',
+      answer: 1.5,
+      explanation: '3 dividido por 2.',
+    },
+    {
+      type: 'choice',
+      prompt: 'Soma de 2 e 3?',
+      options: ['4', '5'],
+      answer: 1,
+      explanation: '2 + 3 = 5.',
+    },
+  ];
+  const activity = await client
+    .post(base + '/activities')
+    .set('Cookie', teacher.cookie)
+    .send({ title: 'Médias e operações', questions });
+  assert.equal(activity.status, 201);
+  const path = base + '/activities/' + activity.body.id;
+  assert.equal((await client.get(path).set('Cookie', student.cookie)).status, 404);
+  assert.equal(
+    (
+      await client
+        .post(path + '/publish')
+        .set('Cookie', other.cookie)
+        .send({})
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await client
+        .post(path + '/publish')
+        .set('Cookie', teacher.cookie)
+        .send({})
+    ).status,
+    200,
+  );
+  const visible = await client.get(path).set('Cookie', student.cookie);
+  assert.equal(visible.body.questions[0].answer, undefined);
+  assert.equal(visible.body.questions[0].explanation, undefined);
+  assert.equal(
+    (
+      await client
+        .post(path + '/submit')
+        .set('Cookie', student.cookie)
+        .send({ answers: ['1gol', 1] })
+    ).status,
+    400,
+  );
+  const deliveries = await Promise.all(
+    [1, 2].map(() =>
+      client
+        .post(path + '/submit')
+        .set('Cookie', student.cookie)
+        .send({ answers: ['1,5', 1] }),
+    ),
+  );
+  assert.deepEqual(deliveries.map((r) => r.status).sort(), [201, 409]);
+  assert.equal(deliveries.find((r) => r.status === 201).body.correct, 2);
+  const result = await client.get(path + '/results').set('Cookie', teacher.cookie);
+  assert.equal(result.body.students.length, 1);
+  assert.equal(result.body.students[0].submission.correct, 2);
+  assert.equal((await client.get(path + '/results').set('Cookie', student.cookie)).status, 403);
+  assert.equal((await client.get(path + '/results').set('Cookie', other.cookie)).status, 403);
+  const { exportClassData } = require('../../dist/services/classPrivacy');
+  const exported = await exportClassData(student.account.id);
+  assert.equal(exported[0].activities[0].submission.correct, 2);
+  await UserModel.deleteUser(student.account.id);
+  assert.equal(
+    (await db.collection('classes').doc(created.body.id).get()).data().studentIds.length,
+    0,
+  );
+  assert.equal(
+    (
+      await db
+        .collection('classes')
+        .doc(created.body.id)
+        .collection('activities')
+        .doc(activity.body.id)
+        .collection('submissions')
+        .doc(student.account.id)
+        .get()
+    ).exists,
+    false,
+  );
+  await UserModel.deleteUser(teacher.account.id);
+  assert.equal((await db.collection('classes').doc(created.body.id).get()).exists, false);
+  assert.equal(
+    (await db.collection('classInvites').doc(classroom.body.inviteCode).get()).exists,
+    false,
+  );
+});
+
+test('professor monta modelo com API, edita gabarito e salva os dados sem expor token ao aluno', async () => {
+  const teacher = await classroomAccount('professor');
+  const other = await classroomAccount('professor');
+  assert.equal(
+    (await client.get('/api/teacher/football/catalog').set('Cookie', cookie)).status,
+    403,
+  );
+  const data = await client
+    .get('/api/teacher/football/data?teamId=127&context=team&count=5')
+    .set('Cookie', teacher.cookie);
+  assert.equal(data.status, 200);
+  assert.equal(data.body.datasets[0].data.matches.length, 5);
+  const token = data.body.datasets[0].token;
+  const template = await client
+    .post('/api/teacher/football/question')
+    .set('Cookie', teacher.cookie)
+    .send({ token, model: 'mean', format: 'numeric' });
+  assert.equal(template.status, 200);
+  assert.equal(template.body.question.answer, 2);
+  assert.equal(
+    (
+      await client
+        .post('/api/teacher/football/question')
+        .set('Cookie', other.cookie)
+        .send({ token, model: 'mean', format: 'numeric' })
+    ).status,
+    400,
+  );
+  const created = await client
+    .post('/api/classes')
+    .set('Cookie', teacher.cookie)
+    .send({ name: 'Turma com futebol' });
+  const base = '/api/classes/' + created.body.id;
+  const turma = await client.get(base).set('Cookie', teacher.cookie);
+  await client
+    .post('/api/classes/join')
+    .set('Cookie', cookie)
+    .send({ code: turma.body.inviteCode });
+  const question = {
+    ...template.body.question,
+    prompt: 'Quanto é a soma de gols marcados nas cinco partidas?',
+    answer: 10,
+    explanation: 'Some 2 + 2 + 2 + 2 + 2.',
+  };
+  const activity = await client
+    .post(base + '/activities')
+    .set('Cookie', teacher.cookie)
+    .send({ title: 'Questão revisada pelo professor', questions: [question] });
+  assert.equal(activity.status, 201);
+  const path = base + '/activities/' + activity.body.id;
+  assert.equal(
+    (
+      await client
+        .post(path + '/publish')
+        .set('Cookie', teacher.cookie)
+        .send({})
+    ).status,
+    200,
+  );
+  const visible = await client.get(path).set('Cookie', cookie);
+  assert.equal(visible.body.questions[0].footballToken, undefined);
+  assert.equal(visible.body.questions[0].answer, undefined);
+  assert.equal(visible.body.questions[0].sportsData.matches.length, 5);
+  assert.equal(visible.body.questions[0].sportsData.source, 'API-Football');
+  const result = await client
+    .post(path + '/submit')
+    .set('Cookie', cookie)
+    .send({ answers: ['10'] });
+  assert.equal(result.body.correct, 1);
 });

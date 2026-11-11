@@ -219,10 +219,17 @@
     update();
   }
 
+  function postLoginDestination() {
+    var code = new URLSearchParams(location.search).get('convite');
+    if (code && /^[a-f0-9]{32}$/.test(code)) sessionStorage.setItem('classInvite', code);
+    var saved = sessionStorage.getItem('classInvite');
+    return saved && /^[a-f0-9]{32}$/.test(saved) ? '/turmas?convite=' + saved : '/dashboard';
+  }
+
   async function redirectIfAuthenticated() {
     try {
       var result = await requestJson('/api/dashboard');
-      if (result.response.ok) window.location.href = '/dashboard';
+      if (result.response.ok) window.location.href = postLoginDestination();
     } catch (error) {}
   }
 
@@ -274,7 +281,8 @@
     var displayName =
       registerMode && el('signupDisplayName') ? el('signupDisplayName').value.trim() : '';
     var username = registerMode && el('signupUser') ? el('signupUser').value.trim() : '';
-    var accepted = registerMode && el('lgpdCheck') ? el('lgpdCheck').checked : false;
+    var consent = el('lgpdCheck');
+    var accepted = registerMode && consent && !consent.disabled && consent.checked;
 
     if (registerMode && !displayName) {
       setFeedback('googleFeedback', 'Informe seu nome de exibição antes de continuar com Google.');
@@ -296,7 +304,7 @@
     if (registerMode && !accepted) {
       setFeedback(
         'googleFeedback',
-        'Aceite os Termos de Uso e a Política de Privacidade antes de continuar com Google.',
+        'Abra a seção de Termos de Uso e Política de Privacidade e marque o aceite antes de continuar com Google.',
       );
       return;
     }
@@ -315,11 +323,12 @@
           displayName: displayName,
           username: username,
           lgpdAccepted: accepted,
+          role: registerMode ? el('signupRole').value : undefined,
         }),
       });
 
       if (result.response.ok && result.data.authenticated) {
-        window.location.href = '/dashboard';
+        window.location.href = postLoginDestination();
         return;
       }
 
@@ -366,7 +375,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        if (result.response.ok && result.data.authenticated) window.location.href = '/dashboard';
+        if (result.response.ok && result.data.authenticated)
+          window.location.href = postLoginDestination();
         else if (result.response.ok && result.data.require2FA) window.location.href = '/mfa';
         else
           setFeedback(
@@ -384,7 +394,50 @@
     redirectIfAuthenticated();
   }
 
+  function bindSignupLegalReview() {
+    var review = el('lgpd');
+    var consent = el('lgpdCheck');
+    var status = el('signupLegalStatus');
+    if (!review || !consent || !status) return;
+
+    consent.disabled = true;
+    consent.checked = false;
+    function unlockConsent() {
+      if (!review.open) return;
+      consent.disabled = false;
+      status.textContent = 'Você já pode marcar o aceite.';
+      review.removeEventListener('toggle', unlockConsent);
+    }
+    review.addEventListener('toggle', unlockConsent);
+    unlockConsent();
+  }
+
   function initRegister() {
+    bindSignupLegalReview();
+    var rolePicker = el('registerRolePicker');
+    var details = el('registerDetails');
+    var googleInitialized = false;
+    document.querySelectorAll('[data-signup-role]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var role = button.getAttribute('data-signup-role');
+        el('signupRole').value = role;
+        el('registerTitle').textContent =
+          role === 'professor' ? 'Criar conta de professor' : 'Criar conta de aluno';
+        rolePicker.hidden = true;
+        details.hidden = false;
+        el('registerTitle').focus();
+        if (!googleInitialized) {
+          googleInitialized = true;
+          initGoogle();
+        }
+      });
+    });
+    el('changeSignupRole').addEventListener('click', function () {
+      details.hidden = true;
+      rolePicker.hidden = false;
+      el('signupRole').value = '';
+      el('rolePickerTitle').focus();
+    });
     bindPasswordToggle('signupPass', 'signupPassToggle');
     bindPasswordToggle('signupConfirm', 'signupConfirmToggle');
     bindPasswordStrength('signupPass', 'signupPasswordStrength');
@@ -398,7 +451,8 @@
       var email = el('signupEmail').value.trim().toLowerCase();
       var password = el('signupPass').value;
       var confirm = el('signupConfirm').value;
-      var accepted = el('lgpdCheck').checked;
+      var consent = el('lgpdCheck');
+      var accepted = !consent.disabled && consent.checked;
       var button = el('signupBtn');
 
       if (!displayName || !username || !email || !password || !confirm) {
@@ -438,7 +492,7 @@
       if (!accepted) {
         setFeedback(
           'signupFeedback',
-          'Aceite os Termos de Uso e a Política de Privacidade para continuar.',
+          'Abra a seção de Termos de Uso e Política de Privacidade e marque o aceite para continuar.',
         );
         return;
       }
@@ -457,6 +511,7 @@
             password: password,
             lgpdAccepted: true,
             enableMfa: el('signupMfa').checked,
+            role: el('signupRole').value,
           }),
         });
 
@@ -469,7 +524,6 @@
       }
     });
 
-    initGoogle();
     redirectIfAuthenticated();
   }
 
@@ -519,7 +573,7 @@
             rememberDevice: el('rememberDevice').checked,
           }),
         });
-        if (result.response.ok) window.location.href = '/dashboard';
+        if (result.response.ok) window.location.href = postLoginDestination();
         else if (!handleExpiredMfaSession(result))
           setFeedback('mfaFeedback', result.data.error || 'Código inválido.');
       } catch (error) {
@@ -569,7 +623,7 @@
             rememberDevice: el('rememberDevice').checked,
           }),
         });
-        if (result.response.ok) window.location.href = '/dashboard';
+        if (result.response.ok) window.location.href = postLoginDestination();
         else if (!handleExpiredMfaSession(result))
           setFeedback('mfaFeedback', result.data.error || 'Código inválido.');
       } catch (error) {
@@ -928,6 +982,8 @@
     var name = user.displayName || user.username || 'estudante';
     var firstName = name.split(/\s+/)[0];
     var answered = Number(user.challengesAnswered) || 0;
+    var tutorial = user.trilhas?.diagnostico;
+    var tutorialComplete = tutorial?.completed === true;
     var correct = Number(user.challengesCorrect) || 0;
     var incorrect = Number(user.challengesIncorrect) || Math.max(answered - correct, 0);
     var accuracy = Number(user.accuracy) || 0;
@@ -947,10 +1003,16 @@
           ? 'Seu progresso está sendo calculado com seus dados reais de desafios. Continue a trilha para aumentar XP, ofensiva e aproveitamento.'
           : 'Faça sua primeira atividade e comece a construir seu histórico de aprendizagem.';
     }
-    if (el('firstJourney')) el('firstJourney').hidden = answered > 0;
+    if (el('firstJourney')) el('firstJourney').hidden = tutorialComplete;
+    if (el('startFirstTrailBtn'))
+      el('startFirstTrailBtn').textContent = tutorial?.answered?.length
+        ? 'CONTINUAR TUTORIAL'
+        : 'COMEÇAR TUTORIAL';
     if (el('dashboardProgress')) el('dashboardProgress').hidden = answered === 0;
     if (el('openChallengeBtn'))
-      el('openChallengeBtn').textContent = answered > 0 ? 'CONTINUAR TRILHA' : 'COMEÇAR ATIVIDADE';
+      el('openChallengeBtn').textContent = tutorialComplete
+        ? 'VER TRILHAS'
+        : el('startFirstTrailBtn').textContent;
 
     if (el('metricXp')) el('metricXp').textContent = xp.toLocaleString('pt-BR');
     if (el('metricLevel')) el('metricLevel').textContent = String(level.number || 1);
@@ -1006,7 +1068,9 @@
     ['openChallengeBtn', 'startFirstTrailBtn'].forEach(function (buttonId) {
       if (el(buttonId))
         el(buttonId).addEventListener('click', function () {
-          window.location.href = '/desafio';
+          window.location.href = session.data.user.trilhas?.diagnostico?.completed
+            ? '/desafio'
+            : '/desafio?trilha=diagnostico';
         });
     });
   }
@@ -1020,6 +1084,16 @@
         return;
       }
       currentUser = session.data.user;
+      if (currentUser.role === 'professor') {
+        document.querySelectorAll('a[href="/desafio"]').forEach(function (link) {
+          link.href = '/professor';
+          link.textContent = 'TURMAS';
+        });
+        ['profileXp', 'profileLevel', 'profileStreak'].forEach(function (id) {
+          var field = el(id);
+          if (field) field.parentElement.hidden = true;
+        });
+      }
 
       if (el('profileName'))
         el('profileName').textContent = currentUser.displayName || currentUser.username;
@@ -1416,6 +1490,7 @@
       });
   }
 
+  if (page === 'login' || page === 'register') postLoginDestination();
   initTheme();
   if (page === 'login') initLogin();
   if (page === 'register') initRegister();

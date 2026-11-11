@@ -53,8 +53,6 @@
               ><span aria-hidden="true">🔥</span> <span id="streakValue">0</span></strong
             ></span
           >
-          <a class="top-link" href="/dashboard">PAINEL</a>
-          <a class="top-link" href="/conta">CONTA</a>
           <button
             class="theme-toggle"
             type="button"
@@ -74,6 +72,12 @@
           </button>
           <button class="logout-button" type="button" id="logoutBtn">SAIR</button>
         </div>
+        <nav class="topbar-nav" aria-label="Navegação principal">
+          <a class="top-link" href="/dashboard">PAINEL</a>
+          <a class="top-link" href="/desafio" aria-current="page">TRILHA</a>
+          <a class="top-link" href="/turmas">TURMAS</a>
+          <a class="top-link" href="/conta">CONTA</a>
+        </nav>
       </div>
     </header>
 
@@ -81,8 +85,8 @@
       <section class="trail-hub" id="trailHub" hidden aria-labelledby="trailHubTitle">
         <p class="summary-code">APRENDIZAGEM / CENTRAL DE TRILHAS</p>
         <h1 id="trailHubTitle">Escolha sua <span>trilha</span></h1>
-        <p>Pratique no seu ritmo e acompanhe suas trilhas concluídas.</p>
-        <nav class="trail-picker" aria-label="Filtrar trilhas">
+        <p id="trailHubDescription">Pratique no seu ritmo e acompanhe suas trilhas concluídas.</p>
+        <nav class="trail-picker" id="trailTabs" aria-label="Filtrar trilhas">
           <button type="button" class="secondary-button" id="trailsPending" aria-pressed="true">
             A fazer
           </button>
@@ -102,7 +106,7 @@
             <strong class="trail-hub-cta">Começar tutorial</strong>
           </a>
           <a class="trail-hub-card" href="/desafio?trilha=facil">
-            <span class="trail-hub-number" aria-hidden="true">02</span>
+            <span class="trail-hub-number" aria-hidden="true">01</span>
             <div class="trail-hub-copy">
               <small>10 QUESTÕES · FÁCIL</small>
               <h2>O básico do jogo</h2>
@@ -111,7 +115,7 @@
             <strong class="trail-hub-cta">Praticar aritmética</strong>
           </a>
           <a class="trail-hub-card" href="/desafio?trilha=media">
-            <span class="trail-hub-number" aria-hidden="true">03</span>
+            <span class="trail-hub-number" aria-hidden="true">02</span>
             <div class="trail-hub-copy">
               <small>10 QUESTÕES · MÉDIA</small>
               <h2>De olho na tabela</h2>
@@ -120,7 +124,7 @@
             <strong class="trail-hub-cta">Praticar operações</strong>
           </a>
           <a class="trail-hub-card" href="/desafio?trilha=avancada">
-            <span class="trail-hub-number" aria-hidden="true">04</span>
+            <span class="trail-hub-number" aria-hidden="true">03</span>
             <div class="trail-hub-copy">
               <small>10 QUESTÕES · AVANÇADA</small>
               <h2>Além do placar</h2>

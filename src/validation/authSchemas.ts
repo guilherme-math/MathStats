@@ -21,6 +21,7 @@ export const signupSchema = z
     password,
     lgpdAccepted: z.literal(true),
     enableMfa: z.boolean().optional(),
+    role: z.enum(['aluno', 'professor']).optional(),
   })
   .strict();
 
@@ -45,6 +46,7 @@ export const googleSchema = z
   .object({
     credential: z.string().min(1).max(8192),
     mode: z.enum(['login', 'register']),
+    role: z.enum(['aluno', 'professor']).optional(),
     displayName: z.string().max(60).optional(),
     username: z.string().max(24).optional(),
     lgpdAccepted: z.boolean().optional(),

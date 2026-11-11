@@ -721,6 +721,11 @@
   setTheme(savedTheme === 'light' ? 'light' : 'dark');
   async function openTrails() {
     var loaded = await loadUserXp();
+    var tutorialComplete = trailProgress.diagnostico?.completed === true;
+    if (loaded && trail && trail !== 'diagnostico' && !tutorialComplete) {
+      window.location.replace('/desafio');
+      return;
+    }
     if (trail && loaded) {
       var progress = trailProgress[trail];
       if (progress?.completed) {
@@ -746,6 +751,7 @@
     var pending = el('pendingTrailList');
     var completed = el('completedTrailList');
     var message = el('trailHubMessage');
+    el('trailTabs').hidden = !loaded || !tutorialComplete;
     if (!loaded) {
       pending.hidden = true;
       message.hidden = false;
@@ -755,6 +761,10 @@
     }
     pending.querySelectorAll('a.trail-hub-card').forEach(function (card) {
       var id = new URL(card.href).searchParams.get('trilha');
+      if (!tutorialComplete && id !== 'diagnostico') {
+        card.remove();
+        return;
+      }
       var progress = trailProgress[id];
       if (progress?.completed) {
         if (id !== 'diagnostico') {
@@ -798,6 +808,11 @@
           'Continuar · ' + progress.answered.length + ' respondidas';
       }
     });
+    if (!tutorialComplete) {
+      el('trailHubTitle').textContent = 'Comece pelo tutorial';
+      el('trailHubDescription').textContent = 'Conclua as cinco questões para liberar as trilhas.';
+      return;
+    }
     function showTab(showCompleted) {
       var list = showCompleted ? completed : pending;
       pending.hidden = showCompleted || !pending.childElementCount;

@@ -52,7 +52,13 @@ export function applySecurityMiddlewares(app: express.Application) {
       credentials: true,
     }),
   );
-  app.use(express.json({ limit: '10kb' }));
+  const defaultJson = express.json({ limit: '10kb' });
+  const classJson = express.json({ limit: '64kb' });
+  app.use((req, res, next) => {
+    const parser =
+      req.path === '/api/classes' || req.path.startsWith('/api/classes/') ? classJson : defaultJson;
+    parser(req, res, next);
+  });
   app.use(express.static(path.join(process.cwd(), 'public'), { redirect: false }));
 
   const sessionStore = process.env.NODE_ENV === 'test' ? undefined : new FirestoreSessionStore();
@@ -82,6 +88,27 @@ export const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas tentativas de login. Aguarde 15 minutos antes de tentar novamente.' },
+});
+
+export const classLimiter = rateLimit({
+  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('class-actions'),
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  keyGenerator: (req) => String((req.session as import('../types/session').AppSession).userId),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas operações em turmas. Aguarde alguns minutos e tente novamente.' },
+});
+
+export const teacherFootballLimiter = rateLimit({
+  store:
+    process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('teacher-football'),
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => String((req.session as import('../types/session').AppSession).userId),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas consultas de futebol. Aguarde alguns minutos e tente novamente.' },
 });
 
 export const mfaLimiter = rateLimit({

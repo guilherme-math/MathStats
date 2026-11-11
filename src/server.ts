@@ -11,6 +11,7 @@ import authRoutes from './routes/authRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import lgpdRoutes from './routes/lgpdRoutes';
 import challengeRoutes from './routes/challengeRoutes';
+import classRoutes from './routes/classRoutes';
 
 const app = express();
 const HTTP_PORT = Number(process.env.HTTP_PORT || 3000);
@@ -22,6 +23,28 @@ app.use('/api', authRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', lgpdRoutes);
 app.use('/api', challengeRoutes);
+app.use('/api', classRoutes);
+
+app.get('/professor', requirePageRole('professor'), (_req, res) => {
+  res.sendFile(path.join(process.cwd(), 'protected', 'turmas.html'));
+});
+app.get(
+  '/turmas',
+  (req, res, next) => {
+    if (
+      !(req.session as import('./types/session').AppSession).userId &&
+      typeof req.query.convite === 'string' &&
+      /^[a-f0-9]{32}$/.test(req.query.convite)
+    ) {
+      return res.redirect('/login?convite=' + req.query.convite);
+    }
+    next();
+  },
+  requirePageRole('aluno', 'professor'),
+  (_req, res) => {
+    res.sendFile(path.join(process.cwd(), 'protected', 'turmas.html'));
+  },
+);
 
 const publicPages: Record<string, string> = {
   '/login': 'login.html',
@@ -42,11 +65,13 @@ app.get('/desafio', requirePageRole('aluno'), (_req, res) => {
   res.sendFile(path.join(process.cwd(), 'protected', 'desafio.html'));
 });
 
-app.get(['/dashboard', '/dashboard.html'], requirePageRole('aluno'), (_req, res) => {
+app.get(['/dashboard', '/dashboard.html'], requirePageRole('aluno', 'professor'), (req, res) => {
+  if ((req.session as import('./types/session').AppSession).role === 'professor')
+    return res.redirect('/professor');
   res.sendFile(path.join(process.cwd(), 'protected', 'dashboard.html'));
 });
 
-app.get(['/conta', '/conta.html'], requirePageRole('aluno'), (_req, res) => {
+app.get(['/conta', '/conta.html'], requirePageRole('aluno', 'professor'), (_req, res) => {
   res.sendFile(path.join(process.cwd(), 'protected', 'conta.html'));
 });
 

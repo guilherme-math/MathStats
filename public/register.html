@@ -46,7 +46,31 @@
     </header>
 
     <main class="auth-shell">
-      <div class="auth-grid">
+      <section
+        class="register-role-picker"
+        id="registerRolePicker"
+        aria-labelledby="rolePickerTitle"
+      >
+        <p class="eyebrow">COMECE SUA JORNADA</p>
+        <h1 id="rolePickerTitle" tabindex="-1">Você é aluno<br />ou <span>professor?</span></h1>
+        <p>Escolha como você quer usar o MathStats.</p>
+        <div class="register-role-options">
+          <button class="register-role-card" type="button" data-signup-role="aluno">
+            <img src="/images/profiles/aluno-limpo.png" alt="" width="144" height="144" />
+            <strong>Aluno</strong>
+            <span>Pratique matemática e participe de turmas.</span>
+            <span class="role-card-action">QUERO APRENDER →</span>
+          </button>
+          <button class="register-role-card" type="button" data-signup-role="professor">
+            <img src="/images/profiles/professor.png" alt="" width="144" height="144" />
+            <strong>Professor</strong>
+            <span>Crie turmas e prepare atividades para seus alunos.</span>
+            <span class="role-card-action">QUERO ENSINAR →</span>
+          </button>
+        </div>
+        <a class="role-picker-login" href="/login">Já tenho uma conta</a>
+      </section>
+      <div class="auth-grid" id="registerDetails" hidden>
         <section class="auth-copy">
           <p class="eyebrow">NOVO PERFIL / CONFIGURAÇÃO</p>
           <h1>CRIE SUA<br /><span>CONTA</span></h1>
@@ -59,11 +83,15 @@
         <section class="auth-card auth-card-register" aria-labelledby="registerTitle">
           <div class="auth-card-body">
             <span class="card-code">CADASTRO</span>
-            <h2 id="registerTitle">Criar acesso</h2>
+            <h2 id="registerTitle" tabindex="-1">Criar acesso</h2>
+            <button type="button" class="register-change-role" id="changeSignupRole">
+              Trocar perfil
+            </button>
             <p class="card-intro">
               Defina como seu nome será exibido e escolha seu usuário de acesso.
             </p>
             <form id="registerForm" novalidate>
+              <input type="hidden" id="signupRole" value="" />
               <div class="register-identity-grid">
                 <div class="field">
                   <label for="signupDisplayName">Nome de exibição</label
@@ -92,6 +120,22 @@
               <details class="terms-box" id="lgpd">
                 <summary>Termos de Uso e Política de Privacidade</summary>
                 <div class="terms-content">
+                  <ul>
+                    <li>
+                      <a id="openSignupTerms" href="/termos-de-uso" target="_blank" rel="noopener"
+                        >Abrir Termos de Uso</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        id="openSignupPrivacy"
+                        href="/politica-de-privacidade"
+                        target="_blank"
+                        rel="noopener"
+                        >Abrir Política de Privacidade</a
+                      >
+                    </li>
+                  </ul>
                   <p>
                     O MathStats utiliza seus dados de cadastro para autenticação, identificação na
                     plataforma, segurança da sessão e funcionamento das funcionalidades de
@@ -112,14 +156,19 @@
                   </p>
                 </div>
               </details>
+              <p class="legal-review-status" id="signupLegalStatus" role="status">
+                Abra a seção acima para liberar o aceite.
+              </p>
               <label class="consent-inline"
-                ><input type="checkbox" id="lgpdCheck" /><span
-                  >Li e concordo com os
-                  <a href="/termos-de-uso" target="_blank" rel="noopener">Termos de Uso</a> e a
-                  <a href="/politica-de-privacidade" target="_blank" rel="noopener"
-                    >Política de Privacidade</a
-                  >. Este aceite registra a ciência dos documentos e não substitui as bases legais
-                  aplicáveis a cada tratamento.</span
+                ><input
+                  type="checkbox"
+                  id="lgpdCheck"
+                  aria-describedby="signupLegalStatus"
+                  disabled
+                /><span
+                  >Li e concordo com os Termos de Uso e a Política de Privacidade. Este aceite
+                  registra a ciência dos documentos e não substitui as bases legais aplicáveis a
+                  cada tratamento.</span
                 ></label
               >
 
@@ -182,9 +231,9 @@
                 hidden
               ></div>
 
-              <label class="consent-inline" for="signupMfa">
+              <label class="consent-inline signup-mfa-option" for="signupMfa">
                 <input id="signupMfa" type="checkbox" /><span
-                  >Ativar verificação em duas etapas (opcional)</span
+                  >Ativar verificação em duas etapas (opcional e recomendado)</span
                 >
               </label>
               <button class="primary-button loading-button" id="signupBtn" type="submit">

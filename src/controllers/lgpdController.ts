@@ -1,3 +1,4 @@
+import { exportClassData } from '../services/classPrivacy';
 import { Request, Response } from 'express';
 import { UserModel } from '../models/userModel';
 import {
@@ -59,6 +60,7 @@ export const LgpdController = {
       }).catch(() => {});
 
       return res.json({
+        turmas: await exportClassData(userId),
         dadosPessoais: {
           displayName: user.displayName || user.username,
           username: user.username,
@@ -144,6 +146,7 @@ export const LgpdController = {
       }).catch(() => {});
 
       const payload = {
+        turmas: await exportClassData(userId),
         exportadoEm: new Date().toISOString(),
         plataforma: 'MathStats',
         titular: {

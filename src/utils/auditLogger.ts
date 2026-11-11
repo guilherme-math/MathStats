@@ -1,6 +1,11 @@
 import { getMongoDb } from '../config/mongodb';
 
 export type AuditEvent =
+  | 'CLASS_CREATED'
+  | 'CLASS_JOINED'
+  | 'ACTIVITY_CREATED'
+  | 'ACTIVITY_PUBLISHED'
+  | 'ACTIVITY_SUBMITTED'
   | 'LOGIN_SUCCESS'
   | 'LOGIN_FAILURE'
   | 'LOGIN_2FA_SUCCESS'

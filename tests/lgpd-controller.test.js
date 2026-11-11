@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.NODE_ENV = 'test';
+require('../dist/services/classPrivacy').exportClassData = async () => [];
 
 function responseMock() {
   return {

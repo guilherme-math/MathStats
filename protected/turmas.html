@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turmas | MathStats</title>
+    <link rel="icon" href="/favicon.ico" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/auth.css" />
+    <link rel="stylesheet" href="/turmas.css" />
+  </head>
+  <body data-page="classes">
+    <div class="mesh" aria-hidden="true"><div class="mesh-plane"></div></div>
+    <header class="auth-topbar">
+      <div class="auth-topbar-inner dashboard-topbar-inner">
+        <a class="brand" href="/dashboard"
+          ><span class="brand-mark">M<span>Σ</span></span
+          ><span class="brand-copy"
+            ><strong>MATH<span>/</span>STATS</strong><small>TURMAS E ATIVIDADES</small></span
+          ></a
+        >
+        <nav class="dashboard-nav" aria-label="Navegação principal">
+          <a href="/dashboard">PAINEL</a>
+          <a id="classTrailLink" href="/desafio" hidden>TRILHA</a>
+          <a class="is-active" href="/turmas" aria-current="page">TURMAS</a>
+          <a href="/conta">CONTA</a>
+        </nav>
+        <button class="secondary-button" id="classLogout" type="button">SAIR</button>
+      </div>
+    </header>
+    <main class="class-shell">
+      <p class="eyebrow" id="classEyebrow">APRENDIZAGEM EM TURMA</p>
+      <h1 id="classGreeting">Suas turmas</h1>
+      <p id="classIntro">Carregando suas turmas...</p>
+      <p id="classFeedback" role="status" aria-live="polite"></p>
+      <section id="classHub" hidden>
+        <section id="teacherWelcome" class="class-panel teacher-welcome" hidden>
+          <p class="eyebrow">SEU ESPAÇO DE ENSINO</p>
+          <h2>Crie sua turma ou prepare uma atividade</h2>
+          <p>Organize seus alunos em turmas e acompanhe as atividades que você publicar.</p>
+          <div class="class-row">
+            <button id="welcomeCreateClass" class="primary-button" type="button">
+              CRIAR TURMA
+            </button>
+            <button id="welcomePrepareActivity" class="secondary-button" type="button">
+              PREPARAR ATIVIDADE
+            </button>
+          </div>
+        </section>
+        <div id="classMetrics" class="class-metrics" hidden></div>
+        <form id="teacherActivityStart" class="class-panel" hidden>
+          <h2>Para qual turma?</h2>
+          <label for="activityClass">Escolha a turma da atividade</label>
+          <select id="activityClass" required></select>
+          <button type="submit" class="primary-button">CONTINUAR</button>
+        </form>
+        <form id="classCreate" class="class-panel" hidden>
+          <h2>Criar turma</h2>
+          <label for="className">Nome da turma</label>
+          <div class="class-row">
+            <input
+              id="className"
+              required
+              minlength="2"
+              maxlength="80"
+              placeholder="Ex: Matemática do futebol"
+            /><button class="primary-button">CRIAR TURMA</button>
+          </div>
+        </form>
+        <form id="classJoin" class="class-panel" hidden>
+          <h2>Entrar em uma turma</h2>
+          <label for="classCode">Código recebido do professor</label>
+          <div class="class-row">
+            <input id="classCode" required maxlength="32" autocomplete="off" /><button
+              class="primary-button"
+            >
+              ENTRAR NA TURMA
+            </button>
+          </div>
+          <small>As atividades da turma complementam suas trilhas de prática.</small>
+        </form>
+        <div id="classList" class="class-grid"></div>
+      </section>
+      <section id="classDetail" hidden>
+        <button id="backClasses" class="secondary-button" type="button">VOLTAR ÀS TURMAS</button>
+        <h2 id="classTitle"></h2>
+        <p id="classParticipants"></p>
+        <div id="classInvite" class="class-panel" hidden>
+          <h3>Convide seus alunos</h3>
+          <p>Compartilhe este código ou o link de ingresso.</p>
+          <label for="inviteCode">Código</label><input id="inviteCode" readonly />
+          <label for="inviteLink">Link da turma</label><input id="inviteLink" readonly />
+          <button id="copyClassInvite" type="button" class="secondary-button">COPIAR LINK</button>
+        </div>
+        <button id="newActivity" class="primary-button" type="button" hidden>
+          PREPARAR ATIVIDADE
+        </button>
+        <form id="activityEditor" class="class-panel" hidden>
+          <h3>Nova atividade</h3>
+          <label for="activityTitle">Título</label
+          ><input id="activityTitle" required maxlength="100" />
+          <div id="questionEditors"></div>
+          <details id="footballTemplates" class="football-builder">
+            <summary>Usar modelos prontos</summary>
+            <p>Escolha os dados para gerar uma questão editável ou escrever a sua.</p>
+            <div class="football-selectors">
+              <div>
+                <label for="footballModel">Conteúdo</label
+                ><select id="footballModel"></select>
+              </div>
+              <div>
+                <label for="footballContext">Contexto</label
+                ><select id="footballContext">
+                  <option value="team">Time</option>
+                  <option value="player">Jogador</option>
+                </select>
+              </div>
+              <div>
+                <label for="footballTeam">Time</label
+                ><select id="footballTeam"></select>
+              </div>
+              <div>
+                <label for="footballCount">Dados</label
+                ><select id="footballCount">
+                  <option value="5">5 partidas disponíveis de 2024</option>
+                  <option value="3">3 partidas disponíveis de 2024</option>
+                </select>
+              </div>
+            </div>
+            <button id="loadFootballData" class="secondary-button" type="button">
+              BUSCAR DADOS
+            </button>
+            <p id="footballFeedback" role="status" aria-live="polite"></p>
+            <div id="footballDatasetPanel" hidden>
+              <label for="footballDataset">Conjunto de dados / jogador</label
+              ><select id="footballDataset"></select>
+              <div id="footballDataPreview"></div>
+              <label for="footballFormat">Formato da resposta</label
+              ><select id="footballFormat">
+                <option value="numeric">Numérica</option>
+                <option value="choice">Múltipla escolha</option>
+              </select>
+              <div class="class-row">
+                <button id="useFootballModel" class="primary-button" type="button">
+                  USAR MODELO E REVISAR
+                </button>
+                <button id="writeFootballQuestion" class="secondary-button" type="button">
+                  ESCREVER COM ESTES DADOS
+                </button>
+              </div>
+              <small
+                >O enunciado, as alternativas, o gabarito e a explicação podem ser ajustados antes
+                de salvar.</small
+              >
+            </div>
+          </details>
+          <div class="class-row">
+            <button id="addQuestion" type="button" class="secondary-button">
+              ADICIONAR QUESTÃO</button
+            ><button class="primary-button">SALVAR ATIVIDADE</button
+            ><button id="cancelActivity" type="button" class="secondary-button">CANCELAR</button>
+          </div>
+          <small
+            >Até dez questões. Revise os gabaritos antes de salvar; a publicação será feita
+            depois.</small
+          >
+        </form>
+        <div id="activityList" class="class-grid"></div>
+        <section id="activityView" class="class-panel" hidden></section>
+      </section>
+    </main>
+    <footer class="class-footer">
+      <a href="/politica-de-privacidade">Política de Privacidade</a>
+      <a href="/termos-de-uso">Termos de Uso</a>
+    </footer>
+    <script src="/auth.js" defer></script>
+    <script src="/turmas.js" defer></script>
+  </body>
+</html>

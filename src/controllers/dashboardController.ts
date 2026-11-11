@@ -102,6 +102,7 @@ export const DashboardController = {
         message: 'Sessão autenticada.',
         user: {
           id: user.id,
+          role: user.role,
           displayName: user.displayName || user.username,
           username: user.username,
           email: user.email,
