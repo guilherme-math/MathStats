@@ -9,14 +9,14 @@ process.env.SESSION_SECRET = 'session-regression-test-secret';
 process.env.ENCRYPTION_KEY = '0'.repeat(64);
 process.env.GOOGLE_CLIENT_ID = 'test-google-client';
 
-const { UserModel } = require('../dist/models/userModel');
-const { AuthController } = require('../dist/controllers/authController');
-const { RecoveryController } = require('../dist/controllers/recoveryController');
-const { validateSession, requireRole } = require('../dist/middlewares/auth');
-const { validateBody, loginSchema, signupSchema } = require('../dist/validation/authSchemas');
-const { signupLimiter } = require('../dist/middlewares/security');
-const mailer = require('../dist/utils/mailer');
-const audit = require('../dist/utils/auditLogger');
+const { UserModel } = require('../../dist/models/userModel');
+const { AuthController } = require('../../dist/controllers/authController');
+const { RecoveryController } = require('../../dist/controllers/recoveryController');
+const { validateSession, requireRole } = require('../../dist/middlewares/auth');
+const { validateBody, loginSchema, signupSchema } = require('../../dist/validation/authSchemas');
+const { signupLimiter } = require('../../dist/middlewares/security');
+const mailer = require('../../dist/utils/mailer');
+const audit = require('../../dist/utils/auditLogger');
 const argon2 = require('argon2');
 
 function application() {

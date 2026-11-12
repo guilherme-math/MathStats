@@ -8,14 +8,14 @@ process.env.NODE_ENV = 'test';
 const {
   challengeGenerationLimiter,
   challengeAnswerLimiter,
-} = require('../dist/middlewares/security');
+} = require('../../dist/middlewares/security');
 const {
   challengeIndexSchema,
   challengeIdSchema,
   challengeAnswerSchema,
-} = require('../dist/validation/challengeSchemas');
-const { normalizeRecentMatches } = require('../dist/services/footballService');
-const { getRecentTeamMatches } = require('../dist/services/footballService');
+} = require('../../dist/validation/challengeSchemas');
+const { normalizeRecentMatches } = require('../../dist/services/footballService');
+const { getRecentTeamMatches } = require('../../dist/services/footballService');
 
 test('limite de geração bloqueia a vigésima primeira requisição', async () => {
   const app = express();

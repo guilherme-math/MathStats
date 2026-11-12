@@ -9,7 +9,7 @@ const {
   recoveryStartLimiter,
   recoveryVerifyLimiter,
   recoveryResetLimiter,
-} = require('../dist/middlewares/security');
+} = require('../../dist/middlewares/security');
 
 function recoveryApplication() {
   const app = express();
