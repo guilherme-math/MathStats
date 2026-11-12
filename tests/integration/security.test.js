@@ -6,7 +6,7 @@ const request = require('supertest');
 
 process.env.NODE_ENV = 'test';
 process.env.SESSION_SECRET = crypto.randomBytes(32).toString('hex');
-const { applySecurityMiddlewares, loginLimiter } = require('../dist/middlewares/security');
+const { applySecurityMiddlewares, loginLimiter } = require('../../dist/middlewares/security');
 
 test('cookie de sessão usa Secure, HttpOnly, SameSite=Strict e expiração', async () => {
   const app = express();

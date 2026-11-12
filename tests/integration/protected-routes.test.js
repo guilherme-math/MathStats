@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 
 process.env.NODE_ENV = 'test';
-const app = require('../dist/server').default;
+const app = require('../../dist/server').default;
 
 test('páginas privadas redirecionam visitante para o login', async () => {
   for (const route of ['/dashboard', '/conta', '/desafio']) {
