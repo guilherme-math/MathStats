@@ -276,6 +276,14 @@
     }
   }
 
+  function confirmSignupAge(feedbackId) {
+    var check = el('signupAge');
+    if (check.checked) return true;
+    setFeedback(feedbackId, 'Confirme que você tem mais de 16 anos para criar sua conta.');
+    check.focus();
+    return false;
+  }
+
   async function handleGoogleCredential(response) {
     var registerMode = page === 'register';
     var displayName =
@@ -301,6 +309,7 @@
         return;
       }
     }
+    if (registerMode && !confirmSignupAge('googleFeedback')) return;
     if (registerMode && !accepted) {
       setFeedback(
         'googleFeedback',
@@ -323,6 +332,7 @@
           displayName: displayName,
           username: username,
           lgpdAccepted: accepted,
+          ageConfirmed: registerMode ? el('signupAge').checked : undefined,
           role: registerMode ? el('signupRole').value : undefined,
         }),
       });
@@ -489,6 +499,7 @@
         setFeedback('signupFeedback', 'As senhas não coincidem.');
         return;
       }
+      if (!confirmSignupAge('signupFeedback')) return;
       if (!accepted) {
         setFeedback(
           'signupFeedback',
@@ -510,6 +521,7 @@
             email: email,
             password: password,
             lgpdAccepted: true,
+            ageConfirmed: el('signupAge').checked,
             enableMfa: el('signupMfa').checked,
             role: el('signupRole').value,
           }),

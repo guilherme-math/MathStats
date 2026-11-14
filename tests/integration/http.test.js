@@ -94,6 +94,7 @@ beforeEach(async () => {
     email: `${suffix}@example.invalid`,
     password: 'Integracao@123',
     lgpdAccepted: true,
+    ageConfirmed: true,
   });
   assert.equal(signup.status, 201);
   user = await UserModel.findByUsername(username);
@@ -473,6 +474,7 @@ async function classroomAccount(role) {
     email: `${suffix}@example.invalid`,
     password: 'Integracao@123',
     lgpdAccepted: true,
+    ageConfirmed: true,
     enableMfa: false,
     role,
   });

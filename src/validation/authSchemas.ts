@@ -20,6 +20,7 @@ export const signupSchema = z
     email: z.email().max(254),
     password,
     lgpdAccepted: z.literal(true),
+    ageConfirmed: z.literal(true),
     enableMfa: z.boolean().optional(),
     role: z.enum(['aluno', 'professor']).optional(),
   })
@@ -50,8 +51,10 @@ export const googleSchema = z
     displayName: z.string().max(60).optional(),
     username: z.string().max(24).optional(),
     lgpdAccepted: z.boolean().optional(),
+    ageConfirmed: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine((data) => data.mode === 'login' || data.ageConfirmed === true);
 
 export const recoveryStartSchema = z.object({ username }).strict();
 export const recoveryVerifySchema = z.object({ token: code }).strict();

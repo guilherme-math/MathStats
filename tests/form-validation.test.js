@@ -19,6 +19,7 @@ test('cadastro aceita o contrato completo e remove espaços das informações p�
     email: 'ana@example.com',
     password: 'Senha@123',
     lgpdAccepted: true,
+    ageConfirmed: true,
   });
 
   assert.equal(result.success, true);
@@ -33,8 +34,11 @@ test('cadastro recusa campos extras, usuário inválido e aceite com tipo incorr
     email: 'ana@example.com',
     password: 'Senha@123',
     lgpdAccepted: true,
+    ageConfirmed: true,
   };
 
+  assert.equal(signupSchema.safeParse({ ...base, ageConfirmed: undefined }).success, false);
+  assert.equal(signupSchema.safeParse({ ...base, ageConfirmed: false }).success, false);
   assert.equal(signupSchema.safeParse({ ...base, role: 'admin' }).success, false);
   assert.equal(signupSchema.safeParse({ ...base, username: 'ana silva' }).success, false);
   assert.equal(signupSchema.safeParse({ ...base, lgpdAccepted: 'true' }).success, false);
@@ -64,6 +68,10 @@ test('MFA e recuperação aceitam somente códigos formados por seis dígitos', 
 
 test('Google, recuperação e troca de senha recusam contratos fora do formato', () => {
   assert.equal(googleSchema.safeParse({ credential: 'token', mode: 'login' }).success, true);
+  const registration = { credential: 'token', mode: 'register' };
+  assert.equal(googleSchema.safeParse(registration).success, false);
+  assert.equal(googleSchema.safeParse({ ...registration, ageConfirmed: false }).success, false);
+  assert.equal(googleSchema.safeParse({ ...registration, ageConfirmed: true }).success, true);
   assert.equal(googleSchema.safeParse({ credential: 'token', mode: 'signin' }).success, false);
   assert.equal(recoveryStartSchema.safeParse({ username: 'ana.silva' }).success, true);
   assert.equal(recoveryStartSchema.safeParse({ username: 'an' }).success, false);
