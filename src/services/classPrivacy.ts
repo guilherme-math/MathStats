@@ -7,6 +7,18 @@ export async function exportClassData(userId: string) {
     db.collection('classes').where('studentIds', 'array-contains', userId).get(),
   ]);
   const result = [];
+  const pending = await db
+    .collection('classes')
+    .where('pendingStudentIds', 'array-contains', userId)
+    .get();
+  for (const c of pending.docs) {
+    result.push({
+      id: c.id,
+      name: c.data().name,
+      relationship: 'solicitacao_pendente',
+      activities: [],
+    });
+  }
   for (const c of [...owned.docs, ...joined.docs]) {
     const isTeacher = c.data().teacherId === userId;
     const activities = await c.ref.collection('activities').get();
@@ -45,6 +57,12 @@ export async function exportClassData(userId: string) {
 }
 
 export async function deleteClassData(userId: string) {
+  const pending = await db
+    .collection('classes')
+    .where('pendingStudentIds', 'array-contains', userId)
+    .get();
+  for (const c of pending.docs)
+    await c.ref.update({ pendingStudentIds: FieldValue.arrayRemove(userId) });
   const owned = await db.collection('classes').where('teacherId', '==', userId).get();
   for (const c of owned.docs) {
     // Mark before deletion so concurrent publication or submission cannot recreate children.

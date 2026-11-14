@@ -90,6 +90,16 @@ export const loginLimiter = rateLimit({
   message: { error: 'Muitas tentativas de login. Aguarde 15 minutos antes de tentar novamente.' },
 });
 
+export const classJoinLimiter = rateLimit({
+  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('class-join'),
+  windowMs: 15 * 60 * 1000,
+  limit: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { error: 'Muitas tentativas de convite. Aguarde alguns minutos.' },
+});
+
 export const classLimiter = rateLimit({
   store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('class-actions'),
   windowMs: 15 * 60 * 1000,

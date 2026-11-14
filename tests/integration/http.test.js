@@ -513,6 +513,29 @@ test('turmas: criação, convite, publicação, correção e isolamento entre co
       .set('Cookie', student.cookie)
       .send({ code: classroom.body.inviteCode });
   assert.equal((await join()).status, 200);
+  assert.equal((await join()).status, 200);
+  assert.equal((await join()).body.pending, true);
+  assert.equal((await client.get(base).set('Cookie', student.cookie)).status, 403);
+  const requests = await client.get(base).set('Cookie', teacher.cookie);
+  assert.equal(requests.body.requests.length, 1);
+  assert.equal(requests.body.requests[0].username, student.account.username);
+  assert.equal(requests.body.requests[0].email, student.account.email);
+  const decision = base + '/memberships/' + student.account.id;
+  assert.equal(
+    (await client.post(decision).set('Cookie', other.cookie).send({ approve: true })).status,
+    403,
+  );
+  assert.equal(
+    (await client.post(decision).set('Cookie', teacher.cookie).send({ approve: false })).status,
+    200,
+  );
+  assert.equal((await client.get(base).set('Cookie', student.cookie)).status, 403);
+  assert.equal((await join()).body.pending, true);
+  assert.equal(
+    (await client.post(decision).set('Cookie', teacher.cookie).send({ approve: true })).status,
+    200,
+  );
+  assert.equal((await join()).body.pending, false);
   const joined = await client.get(base).set('Cookie', student.cookie);
   assert.equal(joined.body.students, 1);
   assert.equal(joined.body.inviteCode, undefined);
@@ -671,6 +694,15 @@ test('professor monta modelo com API, edita gabarito e salva os dados sem expor 
     .post('/api/classes/join')
     .set('Cookie', cookie)
     .send({ code: turma.body.inviteCode });
+  assert.equal(
+    (
+      await client
+        .post(base + '/memberships/' + user.id)
+        .set('Cookie', teacher.cookie)
+        .send({ approve: true })
+    ).status,
+    200,
+  );
   const question = {
     ...template.body.question,
     prompt: 'Quanto é a soma de gols marcados nas cinco partidas?',
@@ -815,6 +847,15 @@ test('agendamento e limite por aluno são aplicados no servidor', async () => {
         .post('/api/classes/join')
         .set('Cookie', cookie)
         .send({ code: turma.body.inviteCode })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await client
+        .post(base + '/memberships/' + user.id)
+        .set('Cookie', teacher.cookie)
+        .send({ approve: true })
     ).status,
     200,
   );

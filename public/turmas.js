@@ -469,6 +469,11 @@
     el('classHub').hidden = false;
     el('classDetail').hidden = true;
     el('classList').replaceChildren();
+    (result.pending || []).forEach(function (request) {
+      var card = node('article', undefined, 'class-card');
+      card.append(node('h3', request.name), node('p', 'Aguardando aprovação do professor.'));
+      el('classList').append(card);
+    });
     el('classList').hidden = showDashboard;
     if (!result.classes.length)
       el('classList').append(
@@ -509,9 +514,39 @@
     el('classParticipants').textContent = c.students + ' participantes';
     var teacher = user.role === 'professor';
     el('classInvite').hidden = !teacher;
+    var requests = el('classRequests');
+    requests.hidden = !teacher;
+    requests.replaceChildren();
+    if (teacher) {
+      requests.append(node('h3', 'Solicitações de entrada'));
+      requests.append(
+        node('p', 'Confira o @usuário e o e-mail com o aluno antes de aprovar a conta.'),
+      );
+      if (!c.requests?.length) requests.append(node('p', 'Nenhuma solicitação pendente.'));
+      (c.requests || []).forEach(function (request) {
+        var row = node('div', undefined, 'question-row');
+        var controls = node('div', undefined, 'question-controls');
+        var identity = node('div');
+        identity.append(node('strong', request.name + ' · @' + request.username));
+        if (request.email) identity.append(node('div', request.email));
+        row.append(identity, controls);
+        function decide(approve) {
+          return async function () {
+            await api('/classes/' + id + '/memberships/' + request.id, 'POST', {
+              approve: approve,
+            });
+            await openClass(id);
+            feedback(approve ? 'Aluno aprovado.' : 'Solicitação recusada.');
+          };
+        }
+        button(controls, 'APROVAR', decide(true));
+        button(controls, 'RECUSAR', decide(false));
+        requests.append(row);
+      });
+    }
     el('newActivity').hidden = !teacher;
     if (teacher) {
-      el('inviteCode').value = c.inviteCode;
+      el('inviteCode').value = '';
       el('inviteLink').value =
         location.origin + '/turmas?convite=' + encodeURIComponent(c.inviteCode);
     }
@@ -1215,6 +1250,12 @@
   form('classJoin', async function () {
     var c = await api('/classes/join', 'POST', { code: el('classCode').value.trim() });
     history.replaceState(null, '', '/turmas');
+    if (c.pending) {
+      el('classJoin').reset();
+      await hub();
+      feedback('Solicitação enviada. Aguarde a aprovação do professor.');
+      return;
+    }
     await openClass(c.id);
     feedback('Você entrou na turma.');
   });
@@ -1336,6 +1377,13 @@
   });
   action(el('cancelActivity'), function () {
     el('activityEditor').hidden = true;
+  });
+  action(el('generateClassInvite'), async function () {
+    var id = currentClass.id;
+    var result = await api('/classes/' + id + '/invite-code', 'POST');
+    if (currentClass?.id !== id) return;
+    el('inviteCode').value = result.code;
+    el('inviteCode').select();
   });
   action(el('copyClassInvite'), async function () {
     try {

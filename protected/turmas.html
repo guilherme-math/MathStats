@@ -125,10 +125,21 @@
         <button id="backClasses" class="secondary-button" type="button">VOLTAR ÀS TURMAS</button>
         <h2 id="classTitle"></h2>
         <p id="classParticipants"></p>
+        <section
+          id="classRequests"
+          class="class-panel"
+          aria-label="Solicitações de entrada"
+          hidden
+        ></section>
         <div id="classInvite" class="class-panel" hidden>
           <h3>Convide seus alunos</h3>
           <p>Compartilhe este código ou o link de ingresso.</p>
-          <label for="inviteCode">Código</label><input id="inviteCode" readonly />
+          <label for="inviteCode">Código de seis dígitos</label>
+          <input id="inviteCode" readonly placeholder="Gere um código para compartilhar" />
+          <button id="generateClassInvite" class="secondary-button" type="button">
+            GERAR CÓDIGO
+          </button>
+          <p>O código vale por 15 minutos após ser gerado.</p>
           <label for="inviteLink">Link da turma</label><input id="inviteLink" readonly />
           <button id="copyClassInvite" type="button" class="secondary-button">COPIAR LINK</button>
         </div>

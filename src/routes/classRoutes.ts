@@ -1,10 +1,10 @@
 import { Router, type Request, type Response } from 'express';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { db } from '../config/firebase';
 import { requireRole } from '../middlewares/auth';
-import { classLimiter, teacherFootballLimiter } from '../middlewares/security';
+import { classJoinLimiter, classLimiter, teacherFootballLimiter } from '../middlewares/security';
 import { type AppSession } from '../types/session';
 import {
   activitySchema,
@@ -146,6 +146,15 @@ router.get(
       .limit(100)
       .get();
     res.json({
+      ...(s.role === 'aluno'
+        ? {
+            pending: (
+              await classes.where('pendingStudentIds', 'array-contains', s.userId).limit(100).get()
+            ).docs
+              .filter((doc) => !doc.data().deleting)
+              .map((doc) => ({ name: doc.data().name })),
+          }
+        : {}),
       classes: snap.docs.map((d) => ({
         id: d.id,
         name: d.data().name,
@@ -204,32 +213,94 @@ router.post(
   }),
 );
 router.post(
+  '/classes/:classId/invite-code',
+  requireRole('professor'),
+  safe(async (req, res) => {
+    const ref = classRef(req);
+    const invites = db.collection('classInvites');
+    const result = await db.runTransaction(async (tx) => {
+      const turma = (await tx.get(ref)).data();
+      authorize(turma, req, true);
+      if (turma!.deleting) throw fail(409, 'Turma indisponível.');
+      const now = Date.now();
+      if (turma!.shortInviteExpiresAt?.toMillis() > now) return { code: turma!.shortInviteCode };
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const code = String(randomInt(1_000_000)).padStart(6, '0');
+        const invite = invites.doc(code);
+        const existing = (await tx.get(invite)).data();
+        if (existing && existing.expiresAt?.toMillis() > now) continue;
+        const expiresAt = new Date(now + 15 * 60 * 1000);
+        tx.set(invite, { classId: ref.id, expiresAt });
+        tx.update(ref, { shortInviteCode: code, shortInviteExpiresAt: expiresAt });
+        return { code };
+      }
+      throw fail(503, 'Não foi possível gerar um código agora. Tente novamente.');
+    });
+    res.json(result);
+  }),
+);
+router.post(
   '/classes/join',
   requireRole('aluno'),
+  classJoinLimiter,
   safe(async (req, res) => {
     const parsed = z
-      .object({ code: z.string().regex(/^[a-f0-9]{32}$/) })
+      .object({ code: z.string().regex(/^(?:[0-9]{6}|[a-f0-9]{32})$/) })
       .strict()
       .safeParse(req.body);
     if (!parsed.success) throw fail(400, 'Informe um código de convite válido.');
-    const classId = await db.runTransaction(async (tx) => {
+    const request = await db.runTransaction(async (tx) => {
       const invite = await tx.get(db.collection('classInvites').doc(parsed.data.code));
-      if (!invite.exists) throw fail(404, 'Convite não encontrado.');
+      if (
+        !invite.exists ||
+        (parsed.data.code.length === 6 && !(invite.data()!.expiresAt?.toMillis() > Date.now()))
+      )
+        throw fail(404, 'Convite inválido ou expirado.');
       const ref = classes.doc(invite.data()!.classId);
       const doc = await tx.get(ref);
       const user = await tx.get(db.collection('users').doc(session(req).userId!));
       if (!doc.exists || doc.data()!.deleting || !user.exists || user.data()?.deleting)
         throw fail(404, 'Turma indisponível.');
-      if (
-        doc.data()!.studentIds.length >= 300 &&
-        !doc.data()!.studentIds.includes(session(req).userId)
-      )
-        throw fail(409, 'Esta turma atingiu o limite de participantes.');
-      tx.update(ref, { studentIds: FieldValue.arrayUnion(session(req).userId) });
-      return ref.id;
+      const data = doc.data()!;
+      const id = user.id;
+      if (data.studentIds.includes(id)) return { id: ref.id, pending: false };
+      const pending: string[] = data.pendingStudentIds || [];
+      if (!pending.includes(id)) {
+        if (pending.length >= 300) throw fail(409, 'Esta turma atingiu o limite de solicitações.');
+        tx.update(ref, { pendingStudentIds: FieldValue.arrayUnion(id) });
+      }
+      return { id: ref.id, pending: true };
     });
-    await log(req, 'CLASS_JOINED');
-    res.json({ id: classId });
+    res.json(request);
+  }),
+);
+router.post(
+  '/classes/:classId/memberships/:studentId',
+  requireRole('professor'),
+  safe(async (req, res) => {
+    const student = idSchema.safeParse(req.params.studentId);
+    const decision = z.object({ approve: z.boolean() }).strict().safeParse(req.body);
+    if (!student.success || !decision.success) throw fail(400, 'Solicitação inválida.');
+    const ref = classRef(req);
+    await db.runTransaction(async (tx) => {
+      const turma = (await tx.get(ref)).data();
+      authorize(turma, req, true);
+      if (turma!.deleting || !turma!.pendingStudentIds?.includes(student.data))
+        throw fail(404, 'Solicitação indisponível.');
+      if (decision.data.approve) {
+        const account = (await tx.get(db.collection('users').doc(student.data))).data();
+        if (!account || account.deleting || account.role !== 'aluno')
+          throw fail(409, 'Conta de aluno indisponível.');
+        if (turma!.studentIds.length >= 300)
+          throw fail(409, 'Esta turma atingiu o limite de participantes.');
+      }
+      tx.update(ref, {
+        pendingStudentIds: FieldValue.arrayRemove(student.data),
+        ...(decision.data.approve ? { studentIds: FieldValue.arrayUnion(student.data) } : {}),
+      });
+    });
+    if (decision.data.approve) await log(req, 'CLASS_JOINED');
+    res.json({ approved: decision.data.approve });
   }),
 );
 router.get(
@@ -365,11 +436,27 @@ router.get(
         submitted: own?.exists || false,
       });
     }
+    const pendingIds: string[] = teacher ? data!.pendingStudentIds || [] : [];
+    const requests = pendingIds.length
+      ? await db.getAll(...pendingIds.map((id) => db.collection('users').doc(id)))
+      : [];
     res.json({
       id: doc.id,
       name: data!.name,
       students: data!.studentIds.length,
-      ...(teacher ? { inviteCode: data!.inviteCode } : {}),
+      ...(teacher
+        ? {
+            inviteCode: data!.inviteCode,
+            requests: requests
+              .filter((user) => user.exists && !user.data()?.deleting)
+              .map((user) => ({
+                id: user.id,
+                name: user.data()!.displayName || user.data()!.username,
+                username: user.data()!.username,
+                email: user.data()!.email,
+              })),
+          }
+        : {}),
       activities: rows,
     });
   }),
