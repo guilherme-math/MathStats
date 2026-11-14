@@ -25,7 +25,7 @@ app.use('/api', lgpdRoutes);
 app.use('/api', challengeRoutes);
 app.use('/api', classRoutes);
 
-app.get('/professor', requirePageRole('professor'), (_req, res) => {
+app.get(['/professor', '/professor/questoes'], requirePageRole('professor'), (_req, res) => {
   res.sendFile(path.join(process.cwd(), 'protected', 'turmas.html'));
 });
 app.get(

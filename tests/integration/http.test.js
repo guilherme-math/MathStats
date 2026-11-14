@@ -513,7 +513,6 @@ test('turmas: criação, convite, publicação, correção e isolamento entre co
       .set('Cookie', student.cookie)
       .send({ code: classroom.body.inviteCode });
   assert.equal((await join()).status, 200);
-  assert.equal((await join()).status, 200);
   const joined = await client.get(base).set('Cookie', student.cookie);
   assert.equal(joined.body.students, 1);
   assert.equal(joined.body.inviteCode, undefined);
@@ -557,6 +556,19 @@ test('turmas: criação, convite, publicação, correção e isolamento entre co
     ).status,
     200,
   );
+  const progressPath = base + '/progress';
+  const beforeDelivery = await client.get(progressPath).set('Cookie', teacher.cookie);
+  assert.equal(beforeDelivery.status, 200);
+  assert.equal(beforeDelivery.body.activities[0].pending, 1);
+  assert.equal(beforeDelivery.body.activities[0].submitted, 0);
+  assert.deepEqual(beforeDelivery.body.activities[0].startedIds, []);
+  assert.equal(beforeDelivery.body.students.length, 1);
+  assert.equal((await client.post(path + '/start').set('Cookie', student.cookie)).status, 204);
+  assert.equal((await client.post(path + '/start').set('Cookie', student.cookie)).status, 204);
+  const started = await client.get(progressPath).set('Cookie', teacher.cookie);
+  assert.deepEqual(started.body.activities[0].startedIds, [started.body.students[0].id]);
+  assert.deepEqual(started.body.activities[0].results, []);
+  assert.equal((await client.get(progressPath).set('Cookie', other.cookie)).status, 403);
   const visible = await client.get(path).set('Cookie', student.cookie);
   assert.equal(visible.body.questions[0].answer, undefined);
   assert.equal(visible.body.questions[0].explanation, undefined);
@@ -586,6 +598,14 @@ test('turmas: criação, convite, publicação, correção e isolamento entre co
   assert.equal((await client.get(path + '/results').set('Cookie', other.cookie)).status, 403);
   const { exportClassData } = require('../../dist/services/classPrivacy');
   const exported = await exportClassData(student.account.id);
+  const afterDelivery = await client.get(progressPath).set('Cookie', teacher.cookie);
+  const [progress] = afterDelivery.body.activities;
+  assert.equal(progress.submitted, 1);
+  assert.equal(progress.pending, 0);
+  assert.deepEqual(
+    progress.questions.map((question) => question.correct),
+    [1, 1],
+  );
   assert.equal(exported[0].activities[0].submission.correct, 2);
   await UserModel.deleteUser(student.account.id);
   assert.equal(
@@ -682,4 +702,171 @@ test('professor monta modelo com API, edita gabarito e salva os dados sem expor 
     .set('Cookie', cookie)
     .send({ answers: ['10'] });
   assert.equal(result.body.correct, 1);
+});
+
+test('professor escolhe uma turma para copiar atividade ou questão como rascunho', async () => {
+  const teacher = await classroomAccount('professor');
+  const other = await classroomAccount('professor');
+  const create = (account, name) =>
+    client.post('/api/classes').set('Cookie', account.cookie).send({ name });
+  const source = await create(teacher, 'Turma origem');
+  const target = await create(teacher, 'Turma destino');
+  const foreign = await create(other, 'Turma externa');
+  for (const response of [source, target, foreign]) assert.equal(response.status, 201);
+  const root = '/api/classes/' + source.body.id + '/activities';
+  const activity = await client
+    .post(root)
+    .set('Cookie', teacher.cookie)
+    .send({
+      title: 'Atividade de soma',
+      questions: [
+        {
+          type: 'choice',
+          prompt: 'Quanto é 2 + 3?',
+          options: ['4', '5', '6'],
+          answer: 1,
+          explanation: 'Some 2 e 3.',
+        },
+      ],
+    });
+  assert.equal(activity.status, 201);
+  const copy = root + '/' + activity.body.id + '/copy';
+  const ownCopy = { targetClassId: target.body.id };
+  assert.equal((await client.post(copy).set('Cookie', teacher.cookie).send({})).status, 400);
+  assert.equal((await client.post(copy).set('Cookie', other.cookie).send(ownCopy)).status, 403);
+  assert.equal(
+    (await client.post(copy).set('Cookie', teacher.cookie).send({ targetClassId: foreign.body.id }))
+      .status,
+    403,
+  );
+  const first = await client.post(copy).set('Cookie', teacher.cookie).send(ownCopy);
+  assert.equal(first.status, 200);
+  assert.equal(first.body.copied, true);
+  assert.equal(
+    (await client.post(copy).set('Cookie', teacher.cookie).send(ownCopy)).body.copied,
+    false,
+  );
+  const targetClass = await client
+    .get('/api/classes/' + target.body.id)
+    .set('Cookie', teacher.cookie);
+  const [draft] = targetClass.body.activities;
+  assert.equal(draft.published, false);
+  const detail = await client
+    .get('/api/classes/' + target.body.id + '/activities/' + draft.id)
+    .set('Cookie', teacher.cookie);
+  assert.equal(detail.body.questions[0].answer, 1);
+  const foreignClass = await client
+    .get('/api/classes/' + foreign.body.id)
+    .set('Cookie', other.cookie);
+  assert.deepEqual(foreignClass.body.activities, []);
+  const questionCopy = await client.post(copy).set('Cookie', teacher.cookie).send({
+    targetClassId: source.body.id,
+    questionIndex: 0,
+  });
+  assert.equal(questionCopy.body.copied, true);
+  const library = await client.get('/api/classes/questions').set('Cookie', teacher.cookie);
+  assert.equal(library.status, 200);
+  assert.equal(library.body.questions.length, 1);
+  assert.equal(library.body.questions[0].prompt, 'Quanto é 2 + 3?');
+  assert.equal((await client.get('/api/classes/questions').set('Cookie', cookie)).status, 403);
+  const overview = await client.get('/api/classes/overview').set('Cookie', teacher.cookie);
+  assert.deepEqual(overview.body, { classes: 2, students: 0, published: 0, drafts: 3 });
+  const editPath = root + '/' + activity.body.id + '/library/0';
+  const edited = {
+    type: 'numeric',
+    prompt: 'Quanto é 4 + 3?',
+    answer: 7,
+    explanation: 'Some 4 e 3.',
+  };
+  assert.equal(
+    (await client.patch(editPath).set('Cookie', other.cookie).send({ question: edited })).status,
+    403,
+  );
+  assert.equal(
+    (await client.patch(editPath).set('Cookie', teacher.cookie).send({ question: edited })).status,
+    200,
+  );
+  const revised = await client.get('/api/classes/questions').set('Cookie', teacher.cookie);
+  assert.equal(revised.body.questions[0].prompt, edited.prompt);
+  assert.equal(
+    (await client.patch(editPath).set('Cookie', teacher.cookie).send({ question: null })).status,
+    200,
+  );
+  const libraryAfterDelete = await client
+    .get('/api/classes/questions')
+    .set('Cookie', teacher.cookie);
+  assert.deepEqual(libraryAfterDelete.body.questions, []);
+  const original = await client.get(root + '/' + activity.body.id).set('Cookie', teacher.cookie);
+  assert.equal(original.body.questions[0].prompt, 'Quanto é 2 + 3?');
+});
+
+test('agendamento e limite por aluno são aplicados no servidor', async () => {
+  const teacher = await classroomAccount('professor');
+  const created = await client
+    .post('/api/classes')
+    .set('Cookie', teacher.cookie)
+    .send({ name: 'Turma com horário' });
+  assert.equal(created.status, 201);
+  const base = '/api/classes/' + created.body.id;
+  const turma = await client.get(base).set('Cookie', teacher.cookie);
+  assert.equal(
+    (
+      await client
+        .post('/api/classes/join')
+        .set('Cookie', cookie)
+        .send({ code: turma.body.inviteCode })
+    ).status,
+    200,
+  );
+  const draft = await client
+    .post(base + '/activities')
+    .set('Cookie', teacher.cookie)
+    .send({
+      title: 'Atividade com horário',
+      questions: [
+        { type: 'numeric', prompt: 'Quanto é 1 + 1?', answer: 2, explanation: 'Some 1 e 1.' },
+      ],
+    });
+  assert.equal(draft.status, 201);
+  const route = base + '/activities/' + draft.body.id;
+  const publish = await client
+    .post(route + '/publish')
+    .set('Cookie', teacher.cookie)
+    .send({
+      opensAt: new Date(Date.now() + 3_600_000).toISOString(),
+      durationMinutes: 10,
+    });
+  assert.equal(publish.status, 200);
+  assert.equal((await client.get(route).set('Cookie', cookie)).status, 409);
+  assert.equal((await client.post(route + '/start').set('Cookie', cookie)).status, 409);
+  const submit = () =>
+    client
+      .post(route + '/submit')
+      .set('Cookie', cookie)
+      .send({ answers: ['2'] });
+  assert.equal((await submit()).status, 409);
+  const ref = db
+    .collection('classes')
+    .doc(created.body.id)
+    .collection('activities')
+    .doc(draft.body.id);
+  await ref.update({ opensAt: new Date(Date.now() - 60_000) });
+  assert.deepEqual((await client.get(route).set('Cookie', cookie)).body.questions, []);
+  assert.equal((await submit()).status, 409);
+  assert.equal((await client.post(route + '/start').set('Cookie', cookie)).status, 204);
+  const first = await client.get(route).set('Cookie', cookie);
+  assert.equal(first.body.questions.length, 1);
+  assert.ok(first.body.deadlineAt > Date.now());
+  assert.equal((await client.post(route + '/start').set('Cookie', cookie)).status, 204);
+  assert.equal(
+    (await client.get(route).set('Cookie', cookie)).body.deadlineAt,
+    first.body.deadlineAt,
+  );
+  await ref
+    .collection('starts')
+    .doc(user.id)
+    .update({ startedAt: new Date(Date.now() - 11 * 60_000) });
+  assert.equal((await submit()).status, 409);
+  const progress = await client.get(base + '/progress').set('Cookie', teacher.cookie);
+  assert.deepEqual(progress.body.activities[0].expiredIds, [user.id]);
 });

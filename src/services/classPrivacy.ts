@@ -21,9 +21,17 @@ export async function exportClassData(userId: string) {
           published: a.data().published,
         });
       } else {
-        const submission = await a.ref.collection('submissions').doc(userId).get();
-        if (submission.exists)
-          rows.push({ id: a.id, title: a.data().title, submission: submission.data() });
+        const [submission, start] = await Promise.all([
+          a.ref.collection('submissions').doc(userId).get(),
+          a.ref.collection('starts').doc(userId).get(),
+        ]);
+        if (submission.exists || start.exists)
+          rows.push({
+            id: a.id,
+            title: a.data().title,
+            submission: submission.data() ?? null,
+            startedAt: start.data()?.startedAt ?? null,
+          });
       }
     }
     result.push({
@@ -49,6 +57,11 @@ export async function deleteClassData(userId: string) {
     // Revoke access before removing personal deliveries.
     await c.ref.update({ studentIds: FieldValue.arrayRemove(userId) });
     const activities = await c.ref.collection('activities').get();
-    for (const a of activities.docs) await a.ref.collection('submissions').doc(userId).delete();
+    for (const a of activities.docs) {
+      await Promise.all([
+        a.ref.collection('submissions').doc(userId).delete(),
+        a.ref.collection('starts').doc(userId).delete(),
+      ]);
+    }
   }
 }

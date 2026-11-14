@@ -25,6 +25,16 @@ import {
 const router = Router();
 const classes = db.collection('classes');
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/);
+const publishOptions = z
+  .object({
+    opensAt: z.iso.datetime().optional(),
+    durationMinutes: z.number().int().min(1).max(1440).optional(),
+  })
+  .strict();
+
+function deadline(startedAt: number | undefined, duration: number | undefined) {
+  return startedAt && duration ? startedAt + duration * 60_000 : null;
+}
 const nameSchema = z.object({ name: z.string().trim().min(2).max(80) }).strict();
 const session = (req: Request) => req.session as AppSession;
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
@@ -144,6 +154,30 @@ router.get(
     });
   }),
 );
+router.get(
+  '/classes/overview',
+  requireRole('professor'),
+  safe(async (req, res) => {
+    const owned = await classes.where('teacherId', '==', session(req).userId!).get();
+    const active = owned.docs.filter((doc) => !doc.data().deleting);
+    const published = await Promise.all(
+      active.map((doc) =>
+        doc.ref.collection('activities').where('published', '==', true).count().get(),
+      ),
+    );
+    const drafts = await Promise.all(
+      active.map((doc) =>
+        doc.ref.collection('activities').where('published', '==', false).count().get(),
+      ),
+    );
+    res.json({
+      classes: active.length,
+      students: new Set(active.flatMap((doc) => doc.data().studentIds)).size,
+      published: published.reduce((total, snapshot) => total + snapshot.data().count, 0),
+      drafts: drafts.reduce((total, snapshot) => total + snapshot.data().count, 0),
+    });
+  }),
+);
 router.post(
   '/classes',
   requireRole('professor'),
@@ -199,6 +233,108 @@ router.post(
   }),
 );
 router.get(
+  '/classes/questions',
+  requireRole('professor'),
+  safe(async (req, res) => {
+    const owned = await classes.where('teacherId', '==', session(req).userId!).get();
+    const active = owned.docs.filter((doc) => !doc.data().deleting);
+    const collections = await Promise.all(
+      active.map((doc) => doc.ref.collection('activities').get()),
+    );
+    const questions = collections.flatMap((snapshot, position) =>
+      snapshot.docs.flatMap((doc) => {
+        const data = doc.data();
+        if (data.copiedFrom || doc.id.startsWith('copy_')) return [];
+        return (data.questions as ActivityContent['questions'])
+          .map((question, index) => ({
+            classId: active[position].id,
+            className: active[position].data().name,
+            activityId: doc.id,
+            activityTitle: data.title,
+            index,
+            prompt: (data.libraryQuestions?.[index] || question).prompt,
+            type: (data.libraryQuestions?.[index] || question).type,
+          }))
+          .filter((question) => data.libraryQuestions?.[question.index] !== null);
+      }),
+    );
+    res.json({ questions });
+  }),
+);
+router.get(
+  '/classes/:classId/progress',
+  requireRole('professor'),
+  safe(async (req, res) => {
+    const ref = classRef(req);
+    const turma = (await ref.get()).data();
+    authorize(turma, req, true);
+    if (turma!.deleting) throw fail(404, 'Turma indisponível.');
+    const ids: string[] = turma!.studentIds;
+    const users = ids.length
+      ? await db.getAll(...ids.map((id) => db.collection('users').doc(id)))
+      : [];
+    const students = users
+      .filter((doc) => doc.exists && !doc.data()?.deleting)
+      .map((doc) => ({
+        id: doc.id,
+        name: doc.data()!.displayName || doc.data()!.username,
+      }));
+    const roster = new Set(students.map((student) => student.id));
+    const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    const recentDays = Array.from({ length: 7 }, (_, i) =>
+      day.format(new Date(Date.now() - (6 - i) * 86_400_000)),
+    );
+    const published = await ref.collection('activities').where('published', '==', true).get();
+    const activities = [];
+    for (const activity of published.docs) {
+      const data = activity.data();
+      if (data.opensAt?.toMillis() > Date.now()) continue;
+      const submissions = await activity.ref
+        .collection('submissions')
+        .select('answers', 'submittedAt', 'correct', 'total')
+        .get();
+      const starts = await activity.ref.collection('starts').select('startedAt').get();
+      const deliveries = submissions.docs.filter((doc) => roster.has(doc.id));
+      const answers = deliveries.map((doc) => doc.data().answers);
+      const daily = Object.fromEntries(recentDays.map((date) => [date, 0]));
+      for (const delivery of deliveries) {
+        const time = delivery.data().submittedAt?.toDate?.();
+        if (!time) continue;
+        const date = day.format(time);
+        if (Object.hasOwn(daily, date)) daily[date]++;
+      }
+      activities.push({
+        id: activity.id,
+        title: data.title,
+        submitted: answers.length,
+        daily,
+        pending: roster.size - answers.length,
+        startedIds: starts.docs.map((doc) => doc.id).filter((id) => roster.has(id)),
+        expiredIds: starts.docs
+          .filter((doc) => {
+            const ends = deadline(doc.data().startedAt?.toMillis(), data.durationMinutes);
+            return roster.has(doc.id) && ends !== null && ends <= Date.now();
+          })
+          .map((doc) => doc.id),
+        results: deliveries.map((doc) => ({
+          id: doc.id,
+          correct: doc.data().correct,
+          total: doc.data().total,
+          outcomes: (doc.data().answers || []).map(
+            (answer: { correct: boolean }) => answer.correct,
+          ),
+        })),
+        questions: (data.questions as ActivityContent['questions']).map((question, index) => ({
+          prompt: question.prompt,
+          correct: answers.filter((submission) => submission?.[index]?.correct === true).length,
+        })),
+      });
+    }
+    const drafts = await ref.collection('activities').where('published', '==', false).count().get();
+    res.json({ activities, students, drafts: drafts.data().count });
+  }),
+);
+router.get(
   '/classes/:classId',
   safe(async (req, res) => {
     const ref = classRef(req);
@@ -223,6 +359,8 @@ router.get(
         id: activity.id,
         title: a.title,
         published: a.published,
+        opensAt: a.opensAt?.toMillis() ?? null,
+        durationMinutes: a.durationMinutes ?? null,
         total: a.questions.length,
         submitted: own?.exists || false,
       });
@@ -276,16 +414,114 @@ router.post(
     res.status(201).json({ id: activity.id });
   }),
 );
+router.patch(
+  '/classes/:classId/activities/:activityId/library/:index',
+  requireRole('professor'),
+  safe(async (req, res) => {
+    const index = Number(req.params.index);
+    const parsed = z
+      .union([z.null(), activitySchema.shape.questions.element])
+      .safeParse(req.body?.question);
+    if (!Number.isInteger(index) || index < 0 || index > 9 || !parsed.success)
+      throw fail(400, 'Confira os dados da questão.');
+    const ref = classRef(req);
+    const activity = activityRef(req);
+    await db.runTransaction(async (tx) => {
+      const turma = await tx.get(ref);
+      authorize(turma.data(), req, true);
+      if (turma.data()!.deleting) throw fail(409, 'Turma indisponível.');
+      const data = (await tx.get(activity)).data();
+      if (!data?.questions[index] || data.libraryQuestions?.[index] === null)
+        throw fail(404, 'Questão indisponível.');
+      const updated = parsed.data;
+      if (updated?.footballToken) throw fail(400, 'Dados da questão inválidos.');
+      tx.update(activity, { ['libraryQuestions.' + index]: updated });
+    });
+    res.json({ saved: true });
+  }),
+);
+router.post(
+  '/classes/:classId/activities/:activityId/copy',
+  requireRole('professor'),
+  safe(async (req, res) => {
+    const parsed = z
+      .object({
+        targetClassId: idSchema,
+        questionIndex: z.number().int().min(0).max(9).optional(),
+      })
+      .strict()
+      .safeParse(req.body);
+    if (!parsed.success) throw fail(400, 'Selecione uma turma de destino.');
+    const { targetClassId, questionIndex } = parsed.data;
+    const sourceClass = classRef(req);
+    const sourceActivity = activityRef(req);
+    const targetClass = classes.doc(targetClassId);
+    if (questionIndex === undefined && sourceClass.id === targetClass.id)
+      throw fail(400, 'Selecione outra turma para copiar a atividade.');
+    const copied = await db.runTransaction(async (tx) => {
+      const source = await tx.get(sourceClass);
+      const destination = await tx.get(targetClass);
+      authorize(source.data(), req, true);
+      authorize(destination.data(), req, true);
+      if (source.data()!.deleting || destination.data()!.deleting)
+        throw fail(409, 'Turma indisponível.');
+      const activity = (await tx.get(sourceActivity)).data();
+      if (!activity) throw fail(404, 'Atividade indisponível.');
+      const question =
+        questionIndex === undefined
+          ? undefined
+          : activity.libraryQuestions?.[questionIndex] === null
+            ? null
+            : (activity.libraryQuestions?.[questionIndex] ?? activity.questions[questionIndex]);
+      if (questionIndex !== undefined && !question) throw fail(404, 'Questão indisponível.');
+      const key =
+        'copy_' +
+        source.id +
+        '_' +
+        sourceActivity.id +
+        (questionIndex === undefined ? '' : '_q' + questionIndex);
+      const target = targetClass.collection('activities').doc(key);
+      if ((await tx.get(target)).exists) return false;
+      tx.create(target, {
+        title:
+          questionIndex === undefined
+            ? activity.title
+            : (activity.title + ' · Questão ' + (questionIndex + 1)).slice(0, 100),
+        questions: questionIndex === undefined ? activity.questions : [question],
+        sportsData:
+          questionIndex === undefined
+            ? activity.sportsData || []
+            : [activity.sportsData?.[questionIndex] ?? null],
+        copiedFrom: {
+          classId: source.id,
+          activityId: sourceActivity.id,
+          questionIndex: questionIndex ?? null,
+        },
+        published: false,
+        createdAt: new Date(),
+      });
+      return true;
+    });
+    if (copied) await log(req, 'ACTIVITY_CREATED');
+    res.json({ copied });
+  }),
+);
 router.post(
   '/classes/:classId/activities/:activityId/publish',
   requireRole('professor'),
   safe(async (req, res) => {
+    const options = publishOptions.safeParse(req.body ?? {});
+    if (!options.success) throw fail(400, 'Confira a data e o limite em minutos.');
+    const opensAt = options.data.opensAt ? new Date(options.data.opensAt) : null;
+    if (opensAt && !(opensAt.getTime() > Date.now()))
+      throw fail(400, 'Agende para uma data e hora futuras.');
     const ref = classRef(req),
       activity = activityRef(req);
     await db.runTransaction(async (tx) => {
       const doc = await tx.get(ref),
         a = await tx.get(activity);
       authorize(doc.data(), req, true);
+      if (a.data()?.published) throw fail(409, 'A atividade já foi publicada ou agendada.');
       if (
         !a.exists ||
         !activitySchema.safeParse({ title: a.data()!.title, questions: a.data()!.questions })
@@ -293,7 +529,11 @@ router.post(
       )
         throw fail(400, 'Atividade inválida.');
       if (doc.data()!.deleting) throw fail(409, 'Turma indisponível.');
-      tx.update(activity, { published: true });
+      tx.update(activity, {
+        published: true,
+        opensAt,
+        durationMinutes: options.data.durationMinutes ?? null,
+      });
     });
     await log(req, 'ACTIVITY_PUBLISHED');
     res.json({ published: true });
@@ -310,18 +550,52 @@ router.get(
       throw fail(404, 'Atividade indisponível.');
     const data = a.data()!;
     const teacher = session(req).role === 'professor';
+    if (!teacher && data.opensAt?.toMillis() > Date.now())
+      throw fail(409, 'A atividade ainda não está aberta.');
     const own = teacher
       ? null
       : await ref.collection('submissions').doc(session(req).userId!).get();
+    const start =
+      !teacher && data.durationMinutes && !own?.exists
+        ? await ref.collection('starts').doc(session(req).userId!).get()
+        : null;
+    const deadlineAt = deadline(start?.data()?.startedAt?.toMillis(), data.durationMinutes);
+    const locked = Boolean(start && (!deadlineAt || deadlineAt <= Date.now()));
     res.json({
       id: a.id,
       title: data.title,
       published: data.published,
-      questions: (teacher ? data.questions : publicQuestions(data.questions)).map(
+      durationMinutes: data.durationMinutes ?? null,
+      deadlineAt,
+      locked,
+      ...(teacher ? { libraryQuestions: data.libraryQuestions || {} } : {}),
+      questions: (locked ? [] : teacher ? data.questions : publicQuestions(data.questions)).map(
         (q: object, i: number) => ({ ...q, sportsData: data.sportsData?.[i] || null }),
       ),
       submission: own?.data() || null,
     });
+  }),
+);
+router.post(
+  '/classes/:classId/activities/:activityId/start',
+  requireRole('aluno'),
+  safe(async (req, res) => {
+    const turma = classRef(req);
+    const activity = activityRef(req);
+    const start = activity.collection('starts').doc(session(req).userId!);
+    await db.runTransaction(async (tx) => {
+      const [classDoc, activityDoc, existing] = await tx.getAll(turma, activity, start);
+      authorize(classDoc.data(), req);
+      if (classDoc.data()!.deleting || !activityDoc.data()?.published)
+        throw fail(404, 'Atividade indisponível.');
+      const data = activityDoc.data()!;
+      if (data.opensAt?.toMillis() > Date.now())
+        throw fail(409, 'A atividade ainda não está aberta.');
+      const ends = deadline(existing.data()?.startedAt?.toMillis(), data.durationMinutes);
+      if (ends && ends <= Date.now()) throw fail(409, 'O tempo desta atividade acabou.');
+      if (!existing.exists) tx.create(start, { startedAt: new Date() });
+    });
+    res.sendStatus(204);
   }),
 );
 router.post(
@@ -343,6 +617,15 @@ router.post(
       if (turma.data()!.deleting || !a.exists || !a.data()!.published)
         throw fail(404, 'Atividade indisponível.');
       if (previous.exists) throw fail(409, 'Você já enviou esta atividade.');
+      const data = a.data()!;
+      if (data.opensAt?.toMillis() > Date.now())
+        throw fail(409, 'A atividade ainda não está aberta.');
+      if (data.durationMinutes) {
+        const start = await tx.get(ref.collection('starts').doc(session(req).userId!));
+        const ends = deadline(start.data()?.startedAt?.toMillis(), data.durationMinutes);
+        if (!ends || ends <= Date.now())
+          throw fail(409, 'A atividade precisa ser iniciada e entregue dentro do tempo.');
+      }
       const result = gradeActivity(
         a.data()!.questions as ActivityContent['questions'],
         parsed.data.answers,

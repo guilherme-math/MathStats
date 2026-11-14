@@ -59,6 +59,32 @@ body[data-page='classes'] > footer {
 .class-card h3 {
   margin: 0;
 }
+.activity-publication {
+  width: 100%;
+  min-width: 0;
+}
+.activity-publication summary {
+  cursor: pointer;
+}
+.activity-publication button[type='submit'] {
+  margin-top: 12px;
+}
+.activity-publication .publication-error,
+.outcome-wrong {
+  color: var(--error);
+}
+.publication-error {
+  margin: 8px 0 0;
+}
+.publication-error:empty {
+  margin: 0;
+}
+.outcome-correct {
+  color: var(--success);
+}
+.class-card .outcome-pending {
+  color: var(--text-secondary);
+}
 .class-row {
   display: flex;
   gap: 12px;
@@ -76,7 +102,7 @@ body[data-page='classes'] > footer {
 #signupRole {
   box-sizing: border-box;
   width: 100%;
-  background: var(--input-bg, #151e19);
+  background: var(--bg-elevated);
   color: var(--text-primary, #edf5f1);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -217,6 +243,124 @@ body[data-page='classes'] .dashboard-nav {
 .class-option input {
   width: auto;
   accent-color: var(--accent);
+}
+.class-alternatives {
+  min-width: 0;
+  margin: 12px 0;
+  padding: 0;
+  border: 0;
+}
+.question-list {
+  display: grid;
+  gap: 12px;
+}
+#dashboardClassCounts {
+  padding: 0;
+  list-style: none;
+}
+.question-row,
+.question-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.question-row {
+  justify-content: space-between;
+}
+.question-summary {
+  flex: 1 1 260px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.question-controls button {
+  width: auto;
+}
+.question-row > .question-controls {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+.question-controls > a {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.question-summary h2,
+.question-summary p,
+.teacher-welcome h2 {
+  margin: 0;
+}
+.question-summary {
+  display: grid;
+  gap: 6px;
+}
+.dashboard-activity summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.dashboard-activity li {
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+}
+.class-metrics > div {
+  flex: 1 1 155px;
+}
+.teacher-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.teacher-ring {
+  display: grid;
+  place-items: center;
+  width: 132px;
+  aspect-ratio: 1;
+  margin: 16px 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--bg-secondary) 58%, transparent 59%),
+    conic-gradient(var(--accent-bright) var(--accuracy), var(--border) 0);
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+}
+.teacher-bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+.teacher-bars li {
+  display: grid;
+  gap: 5px;
+  text-align: center;
+  font-size: 0.72rem;
+}
+.teacher-bar-track {
+  height: 100px;
+  display: flex;
+  align-items: flex-end;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.teacher-bar {
+  width: 100%;
+  height: var(--bar-height);
+  background: var(--accent);
+}
+.class-option-editor {
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.class-option-editor input[type='text'],
+.class-option-editor input:not([type]) {
+  flex: 1;
+  min-width: 0;
+}
+.class-option-editor input[type='radio'] {
+  min-height: auto;
 }
 .class-result {
   border-left: 3px solid var(--accent);

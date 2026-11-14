@@ -19,7 +19,12 @@
     el('classFeedback').classList.toggle('is-error', !!error);
   }
   function setNavigation(inClass) {
-    var active = user.role === 'professor' && !inClass ? '/dashboard' : '/turmas';
+    var active =
+      location.pathname === '/professor/questoes'
+        ? '/professor/questoes'
+        : user.role === 'professor' && !inClass && location.pathname === '/professor'
+          ? '/dashboard'
+          : '/turmas';
     document.querySelectorAll('.dashboard-nav a').forEach(function (link) {
       var isActive = link.getAttribute('href') === active;
       link.classList.toggle('is-active', isActive);
@@ -34,6 +39,7 @@
       headers: { 'Content-Type': 'application/json' },
       body: data === undefined ? undefined : JSON.stringify(data),
     });
+    if (response.status === 204) return;
     var result = await response.json();
     if (response.status === 401) window.location.href = '/login';
     if (!response.ok) throw new Error(result.error || 'Não foi possível concluir a operação.');
@@ -74,10 +80,237 @@
     parent.append(b);
     return b;
   }
+  function renderTeacherCharts(container, activities) {
+    container.replaceChildren();
+    container.hidden = activities.length === 0;
+    if (!activities.length) return;
+    var submitted = 0,
+      pending = 0,
+      correct = 0,
+      answered = 0;
+    var daily = {};
+    activities.forEach(function (activity) {
+      submitted += activity.submitted;
+      pending += activity.pending;
+      answered += activity.submitted * activity.questions.length;
+      activity.questions.forEach(function (question) {
+        correct += question.correct;
+      });
+      Object.entries(activity.daily || {}).forEach(function ([date, count]) {
+        daily[date] = (daily[date] || 0) + count;
+      });
+    });
+    var accuracy = answered ? Math.round((correct * 100) / answered) : 0;
+    var performance = node('section', undefined, 'class-card');
+    var ring = node('div', answered ? accuracy + '%' : 'Sem respostas', 'teacher-ring');
+    ring.style.setProperty('--accuracy', accuracy + '%');
+    performance.append(
+      node('h3', 'Precisão das respostas'),
+      ring,
+      node('p', correct + ' acertos de ' + answered + ' respostas'),
+      node('p', submitted + ' entregas · ' + pending + ' pendências'),
+    );
+    var timeline = node('section', undefined, 'class-card');
+    var bars = node('ul', undefined, 'teacher-bars');
+    var max = Math.max(1, ...Object.values(daily));
+    Object.entries(daily)
+      .sort()
+      .forEach(function ([date, count]) {
+        var bar = node('span', undefined, 'teacher-bar');
+        bar.setAttribute('aria-hidden', 'true');
+        bar.style.setProperty('--bar-height', Math.max(2, (100 * count) / max) + '%');
+        var track = node('span', undefined, 'teacher-bar-track');
+        track.append(bar);
+        var entry = node('li');
+        entry.append(
+          node('strong', String(count)),
+          track,
+          node('small', date.slice(8) + '/' + date.slice(5, 7)),
+        );
+        bars.append(entry);
+      });
+    timeline.append(node('h3', 'Entregas nos últimos 7 dias'), bars);
+    container.append(performance, timeline);
+  }
+  function renderStudentProgress(students, activities, scope) {
+    var panel = el('dashboardStudents');
+    panel.hidden = false;
+    panel.replaceChildren(node('h3', 'Desempenho dos alunos'));
+    var rows = students.map(function (student) {
+      return {
+        id: student.id,
+        name: student.name,
+        delivered: 0,
+        started: 0,
+        expired: 0,
+        assigned: 0,
+        correct: 0,
+        total: 0,
+      };
+    });
+    var byId = new Map(
+      students.map(function (student, index) {
+        return [student.id, rows[index]];
+      }),
+    );
+    activities.forEach(function (activity) {
+      activity.studentIds.forEach(function (id) {
+        byId.get(id).assigned++;
+      });
+      var delivered = new Set();
+      activity.results.forEach(function (result) {
+        var row = byId.get(result.id);
+        delivered.add(result.id);
+        row.delivered++;
+        row.correct += result.correct;
+        row.total += result.total;
+      });
+      activity.startedIds.forEach(function (id) {
+        if (delivered.has(id)) return;
+        if (activity.expiredIds?.includes(id)) byId.get(id).expired++;
+        else byId.get(id).started++;
+      });
+    });
+    var graded = rows.filter(function (row) {
+      return row.total > 0;
+    });
+    var average = graded.length
+      ? Math.round(
+          graded.reduce(function (sum, row) {
+            return sum + (100 * row.correct) / row.total;
+          }, 0) / graded.length,
+        ) + '%'
+      : 'Sem entregas';
+    panel.append(
+      node(
+        'p',
+        'Média · ' +
+          scope +
+          ': ' +
+          average +
+          ' · ' +
+          graded.length +
+          ' de ' +
+          rows.length +
+          ' alunos com entrega',
+      ),
+    );
+    var filter = field(panel, 'Situação', 'select', 'dashboardStudentStatus');
+    [
+      ['', 'Todos os alunos'],
+      ['done', 'Concluíram'],
+      ['started', 'Em andamento'],
+      ['pending', 'Ainda não começaram'],
+      ['expired', 'Tempo esgotado'],
+    ].forEach(function ([value, label]) {
+      var option = node('option', label);
+      option.value = value;
+      filter.append(option);
+    });
+    var wrap = node('div', undefined, 'football-data');
+    var table = node('table');
+    var head = node('tr');
+    ['Aluno', 'Situação', 'Entregas', 'Acertos', 'Erros', 'Média'].forEach(function (label) {
+      head.append(node('th', label));
+    });
+    var thead = node('thead');
+    thead.append(head);
+    var body = node('tbody');
+    table.append(thead, body);
+    wrap.append(table);
+    var empty = node('p', 'Nenhum aluno para este filtro.');
+    var detail = node('section', undefined, 'class-panel');
+    detail.hidden = true;
+    panel.append(wrap, empty, detail);
+    function showStudent(row) {
+      detail.hidden = false;
+      var title = node('h3', row.name);
+      title.tabIndex = -1;
+      detail.replaceChildren(title);
+      button(detail, 'FECHAR DETALHES', function () {
+        detail.hidden = true;
+      });
+      if (!row.assigned) detail.append(node('p', 'Nenhuma atividade neste recorte.'));
+      activities
+        .filter(function (activity) {
+          return activity.studentIds.includes(row.id);
+        })
+        .forEach(function (activity) {
+          var result = activity.results.find(function (entry) {
+            return entry.id === row.id;
+          });
+          var card = node('article', undefined, 'class-card');
+          card.append(node('h4', activity.label));
+          if (result) {
+            card.append(node('p', result.correct + '/' + result.total + ' acertos'));
+            var questions = node('ol');
+            activity.questions.forEach(function (question, index) {
+              var outcome = result.outcomes?.[index];
+              var label =
+                outcome === true
+                  ? 'Acertou'
+                  : outcome === false
+                    ? 'Errou'
+                    : 'Sem correção registrada';
+              var item = node('li');
+              var tone = outcome === true ? 'correct' : outcome === false ? 'wrong' : 'pending';
+              item.append(node('strong', label, 'outcome-' + tone), ' · ' + question.prompt);
+              questions.append(item);
+            });
+            card.append(questions);
+          } else {
+            var status = activity.expiredIds?.includes(row.id)
+              ? 'Tempo esgotado'
+              : activity.startedIds.includes(row.id)
+                ? 'Em andamento'
+                : 'Pendente';
+            card.append(node('p', status, status === 'Pendente' ? 'outcome-pending' : undefined));
+          }
+          detail.append(card);
+        });
+      title.focus();
+    }
+    function renderRows() {
+      body.replaceChildren();
+      rows.forEach(function (row) {
+        var status = !row.assigned
+          ? ['', 'Sem atividades']
+          : row.delivered === row.assigned
+            ? ['done', 'Concluiu']
+            : row.expired && row.delivered + row.expired === row.assigned
+              ? ['expired', 'Tempo esgotado']
+              : row.delivered || row.started || row.expired
+                ? ['started', 'Em andamento']
+                : ['pending', 'Ainda não começou'];
+        if (filter.value && filter.value !== status[0]) return;
+        var tr = node('tr');
+        var nameCell = node('td');
+        button(nameCell, row.name, function () {
+          showStudent(row);
+        });
+        tr.append(nameCell);
+        [
+          status[1],
+          row.delivered + '/' + row.assigned,
+          row.correct,
+          row.total - row.correct,
+          row.total ? Math.round((100 * row.correct) / row.total) + '%' : 'Sem entrega',
+        ].forEach(function (value) {
+          tr.append(node('td', String(value)));
+        });
+        body.append(tr);
+      });
+      empty.hidden = body.childElementCount > 0;
+      wrap.hidden = !empty.hidden;
+    }
+    filter.addEventListener('change', renderRows);
+    renderRows();
+  }
   async function hub() {
     var result = await api('/classes');
+    var showDashboard = user.role === 'professor' && location.pathname === '/professor';
     setNavigation(false);
-    el('teacherWelcome').hidden = user.role !== 'professor';
+    el('teacherWelcome').hidden = !showDashboard;
     el('classCreate').hidden = true;
     el('teacherActivityStart').hidden = true;
     el('activityClass').replaceChildren();
@@ -86,27 +319,157 @@
       option.value = c.id;
       el('activityClass').append(option);
     });
-    el('classMetrics').hidden = user.role !== 'professor';
+    el('classMetrics').hidden = !showDashboard;
+    el('teacherClassFilter').hidden = !showDashboard;
     el('classMetrics').replaceChildren();
-    if (user.role === 'professor') {
-      [
-        ['Turmas', result.classes.length],
-        [
-          'Participações de alunos',
-          result.classes.reduce(function (sum, c) {
-            return sum + c.students;
-          }, 0),
-        ],
-      ].forEach(function (metric) {
-        var card = node('div');
-        card.append(node('span', metric[0]), node('strong', String(metric[1])));
-        el('classMetrics').append(card);
+    if (showDashboard) {
+      var filter = el('dashboardClass');
+      var activityFilter = el('dashboardActivity');
+      var charts = el('dashboardCharts');
+      var all = node('option', 'Todas as turmas');
+      all.value = '';
+      filter.replaceChildren(all);
+      result.classes.forEach(function (c) {
+        var option = node('option', c.name);
+        option.value = c.id;
+        filter.append(option);
       });
+      var progressRequest = 0;
+      async function renderClassCounts() {
+        var request = ++progressRequest;
+        var scope = filter.selectedOptions[0].textContent;
+        var list = el('dashboardClassCounts');
+        var activities = el('dashboardActivities');
+        var status = el('dashboardActivityStatus');
+        list.replaceChildren();
+        activities.replaceChildren();
+        el('classMetrics').replaceChildren();
+        charts.hidden = true;
+        el('dashboardStudents').hidden = true;
+        activityFilter.disabled = true;
+        var allActivities = node('option', 'Todas as atividades publicadas');
+        allActivities.value = '';
+        activityFilter.replaceChildren(allActivities);
+        var visible = result.classes.filter(function (c) {
+          return !filter.value || c.id === filter.value;
+        });
+        visible.forEach(function (c) {
+          var row = node('li', undefined, 'question-row');
+          row.append(
+            node('strong', c.name),
+            node('span', c.students + (c.students === 1 ? ' aluno' : ' alunos')),
+          );
+          list.append(row);
+        });
+        if (!visible.length) list.append(node('li', 'Você ainda não tem turmas.'));
+        status.textContent = visible.length ? 'Carregando indicadores de ' + scope + '...' : '';
+        try {
+          var roster = new Map();
+          var published = [];
+          var drafts = 0;
+          for (var offset = 0; offset < visible.length; offset += 5) {
+            var group = visible.slice(offset, offset + 5);
+            var reports = await Promise.all(
+              group.map(function (c) {
+                return api('/classes/' + encodeURIComponent(c.id) + '/progress');
+              }),
+            );
+            if (request !== progressRequest) return;
+            reports.forEach(function (report, index) {
+              var c = group[index];
+              var studentIds = report.students.map(function (student) {
+                roster.set(student.id, student);
+                return student.id;
+              });
+              drafts += report.drafts;
+              report.activities.forEach(function (activity) {
+                published.push(
+                  Object.assign(activity, {
+                    key: c.id + '/' + activity.id,
+                    studentIds: studentIds,
+                    label: filter.value ? activity.title : c.name + ' · ' + activity.title,
+                  }),
+                );
+              });
+            });
+          }
+          status.textContent = published.length
+            ? 'Exibindo: ' + scope
+            : 'Nenhuma atividade publicada neste filtro.';
+          [
+            ['Turmas no filtro', visible.length],
+            ['Alunos únicos', roster.size],
+            ['Atividades publicadas', published.length],
+            ['Atividades em rascunho', drafts],
+          ].forEach(function (metric) {
+            var card = node('div');
+            card.append(node('span', metric[0]), node('strong', String(metric[1])));
+            el('classMetrics').append(card);
+          });
+          published.forEach(function (activity) {
+            var option = node('option', activity.label);
+            option.value = activity.key;
+            activityFilter.append(option);
+          });
+          activityFilter.disabled = !published.length;
+          function renderActivities() {
+            var selected = published.filter(function (activity) {
+              return !activityFilter.value || activity.key === activityFilter.value;
+            });
+            activities.replaceChildren();
+            renderTeacherCharts(charts, selected);
+            var assigned = new Set(
+              selected.flatMap(function (activity) {
+                return activity.studentIds;
+              }),
+            );
+            var students = Array.from(roster.values()).filter(function (student) {
+              return !activityFilter.value || assigned.has(student.id);
+            });
+            renderStudentProgress(students, selected, scope);
+            selected.forEach(function (activity) {
+              var card = node('details', undefined, 'class-card dashboard-activity');
+              var summary = node('summary', activity.label);
+              var counts = node(
+                'p',
+                activity.submitted + ' entregaram · ' + activity.pending + ' pendentes',
+              );
+              var questions = node('ol');
+              activity.questions.forEach(function (question) {
+                var item = node('li');
+                item.append(
+                  node('strong', question.prompt),
+                  node(
+                    'p',
+                    activity.submitted +
+                      ' responderam · ' +
+                      activity.pending +
+                      ' pendentes · ' +
+                      question.correct +
+                      ' acertos',
+                  ),
+                );
+                questions.append(item);
+              });
+              card.append(summary, counts, questions);
+              activities.append(card);
+            });
+          }
+          activityFilter.onchange = renderActivities;
+          renderActivities();
+        } catch (error) {
+          if (request === progressRequest) status.textContent = error.message;
+        }
+      }
+      filter.onchange = renderClassCounts;
+      if (result.classes.length) filter.value = result.classes[0].id;
+      renderClassCounts();
     }
     currentClass = null;
     el('classHub').hidden = false;
     el('classDetail').hidden = true;
     el('classList').replaceChildren();
+    el('classList').hidden = showDashboard;
     if (!result.classes.length)
       el('classList').append(
         node(
@@ -164,30 +527,88 @@
       );
     c.activities.forEach(function (a) {
       var card = node('article', undefined, 'class-card');
+      var scheduled = a.opensAt && a.opensAt > Date.now();
       card.append(
         node('h3', a.title),
-        node('p', a.total + ' questões · ' + (a.published ? 'Publicada' : 'Não publicada')),
+        node(
+          'p',
+          a.total +
+            ' questões · ' +
+            (scheduled
+              ? 'Abre em ' +
+                new Date(a.opensAt).toLocaleString('pt-BR', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })
+              : a.published
+                ? 'Publicada'
+                : 'Rascunho'),
+        ),
       );
-      button(
-        card,
-        teacher ? 'REVISAR ATIVIDADE' : a.submitted ? 'VER CORREÇÃO' : 'RESPONDER',
-        function () {
-          return openActivity(a.id);
-        },
-        true,
-      );
-      if (teacher && !a.published)
-        button(card, 'PUBLICAR', async function () {
-          await api('/classes/' + id + '/activities/' + a.id + '/publish', 'POST', {});
-          await openClass(id);
-          feedback('Atividade publicada para os alunos da turma.');
-        });
+      if (a.durationMinutes)
+        card.append(node('p', 'Limite após iniciar: ' + a.durationMinutes + ' min'));
+      if (teacher || !scheduled)
+        button(
+          card,
+          teacher ? 'REVISAR ATIVIDADE' : a.submitted ? 'VER CORREÇÃO' : 'RESPONDER',
+          function () {
+            return openActivity(a.id);
+          },
+          true,
+        );
+      if (teacher && !a.published) addPublishForm(card, id, a.id);
       if (teacher)
         button(card, 'VER RESULTADOS', function () {
           return results(a.id);
         });
       el('activityList').append(card);
     });
+  }
+  function addPublishForm(card, classId, activityId) {
+    var panel = node('details', undefined, 'activity-publication');
+    panel.append(node('summary', 'Publicar ou agendar'));
+    var form = node('form');
+    var opening = field(
+      form,
+      'Data e hora de abertura (hora local, opcional)',
+      'input',
+      'opening-' + activityId,
+    );
+    opening.type = 'datetime-local';
+    opening.required = false;
+    var duration = field(form, 'Limite em minutos (opcional)', 'input', 'duration-' + activityId);
+    duration.type = 'number';
+    duration.min = '1';
+    duration.max = '1440';
+    duration.required = false;
+    var submit = node('button', 'CONFIRMAR PUBLICAÇÃO', 'primary-button');
+    submit.type = 'submit';
+    var errorMessage = node('p', undefined, 'publication-error');
+    errorMessage.setAttribute('role', 'alert');
+    form.append(submit, errorMessage);
+    form.addEventListener('submit', async function (event) {
+      event.preventDefault();
+      submit.disabled = true;
+      errorMessage.textContent = '';
+      try {
+        var options = {};
+        if (opening.value) options.opensAt = new Date(opening.value).toISOString();
+        if (duration.value) options.durationMinutes = Number(duration.value);
+        await api(
+          '/classes/' + classId + '/activities/' + activityId + '/publish',
+          'POST',
+          options,
+        );
+        await openClass(classId);
+        feedback(opening.value ? 'Abertura agendada.' : 'Atividade publicada.');
+      } catch (error) {
+        errorMessage.textContent = error.message;
+      } finally {
+        submit.disabled = false;
+      }
+    });
+    panel.append(form);
+    card.append(panel);
   }
   function field(parent, label, tag, id, max) {
     var l = node('label', label);
@@ -199,15 +620,22 @@
     parent.append(l, input);
     return input;
   }
-  function addQuestion(seed, { focus = true, replaceBlank = false } = {}) {
-    var editors = el('questionEditors');
+  function addQuestion(
+    seed,
+    { focus = true, replaceBlank = false, editors = el('questionEditors'), removable = true } = {},
+  ) {
     var first = editors.firstElementChild;
     var replace = replaceBlank && editors.children.length === 1 && first.isBlankQuestion();
     if (!replace && editors.children.length >= 10)
       return feedback('O limite é de dez questões.', true);
     var index = replace ? questionCount : ++questionCount,
       box = node('fieldset', undefined, 'class-question');
-    box.append(node('legend', 'Questão ' + index));
+    box.append(node('legend'));
+    function numberQuestions() {
+      Array.from(editors.children).forEach(function (question, position) {
+        question.firstElementChild.textContent = 'Questão ' + (position + 1);
+      });
+    }
     if (seed && seed.sportsData) renderSportsData(box, seed.sportsData);
     var prompt = field(box, 'Enunciado', 'textarea', 'q-prompt-' + index, 800);
     var type = field(box, 'Formato', 'select', 'q-type-' + index);
@@ -216,78 +644,136 @@
       option.value = v;
       type.append(option);
     });
-    var optionsWrap = node('div');
+    var optionsWrap = node('fieldset', undefined, 'class-alternatives');
+    optionsWrap.append(node('legend', 'Alternativas e resposta correta'));
     box.append(optionsWrap);
-    var options = field(
+    var rows = [];
+    var addOption = button(
       optionsWrap,
-      'Alternativas, uma por linha (de duas a cinco)',
-      'textarea',
-      'q-options-' + index,
-      904,
+      'ADICIONAR ALTERNATIVA',
+      function () {
+        appendOption('', false);
+        rows[rows.length - 1].input.focus();
+      },
+      true,
     );
-    options.required = false;
-    optionsWrap.hidden = true;
-    var answer = field(box, 'Resposta correta (apenas número)', 'input', 'q-answer-' + index, 100);
+
+    function updateOptions() {
+      addOption.hidden = rows.length >= 5;
+      rows.forEach(function (row, position) {
+        var letter = String.fromCharCode(65 + position);
+        row.input.setAttribute('aria-label', 'Texto da alternativa ' + letter);
+        row.radio.setAttribute('aria-label', 'Marcar alternativa ' + letter + ' como correta');
+        row.remove.hidden = rows.length <= 2;
+      });
+    }
+    function appendOption(value, correct) {
+      if (rows.length >= 5) return;
+      var wrapper = node('div', undefined, 'class-option class-option-editor');
+      var input = node('input');
+      input.maxLength = 180;
+      input.required = type.value === 'choice';
+      input.value = value;
+      var radio = node('input');
+      radio.type = 'radio';
+      radio.name = 'correct-option-' + index;
+      radio.checked = correct;
+      wrapper.append(radio, input);
+      var row = {
+        input: input,
+        radio: radio,
+        remove: button(
+          wrapper,
+          'REMOVER',
+          function () {
+            if (rows.length <= 2) return;
+            rows.splice(rows.indexOf(row), 1);
+            wrapper.remove();
+            updateOptions();
+          },
+          true,
+        ),
+      };
+      rows.push(row);
+      optionsWrap.insertBefore(wrapper, addOption);
+      updateOptions();
+    }
+    var numberWrap = node('div');
+    box.append(numberWrap);
+    var answer = field(numberWrap, 'Resposta correta', 'input', 'q-answer-' + index, 100);
     answer.inputMode = 'decimal';
-    var hint = node('small', 'Para alternativas, informe a posição correta: 1, 2, 3, 4 ou 5.');
-    hint.hidden = true;
-    box.append(hint);
-    type.addEventListener('change', function () {
-      optionsWrap.hidden = type.value !== 'choice';
-      options.required = type.value === 'choice';
-      hint.hidden = type.value !== 'choice';
-      answer.inputMode = type.value === 'choice' ? 'numeric' : 'decimal';
-    });
     var explanation = field(box, 'Explicação da resposta', 'textarea', 'q-explain-' + index, 800);
+    type.addEventListener('change', function () {
+      var choice = type.value === 'choice';
+      optionsWrap.hidden = !choice;
+      numberWrap.hidden = choice;
+      answer.required = !choice;
+      rows.forEach(function (row) {
+        row.input.required = choice;
+      });
+    });
+    (seed?.options || ['', '']).forEach(function (value, position) {
+      appendOption(value, seed?.answer === position && seed?.type === 'choice');
+    });
     box.isBlankQuestion = function () {
       return (
         !seed &&
         type.value === 'numeric' &&
-        ![prompt, options, answer, explanation].some(function (input) {
+        ![prompt, answer, explanation].some(function (input) {
           return input.value.trim();
         })
       );
     };
     box.readQuestion = function () {
-      if (!/^-?\d+(?:[.,]\d+)?$/.test(answer.value.trim()))
-        throw new Error('Informe um gabarito numérico válido.');
-      var value = Number(answer.value.replace(',', '.'));
       var q = {
         type: type.value,
         prompt: prompt.value.trim(),
         explanation: explanation.value.trim(),
-        answer: type.value === 'choice' ? value - 1 : value,
       };
-      if (type.value === 'choice')
-        q.options = options.value
-          .split('\n')
-          .map(function (s) {
-            return s.trim();
-          })
-          .filter(Boolean);
+      if (type.value === 'choice') {
+        q.options = rows.map(function (row) {
+          return row.input.value.trim();
+        });
+        q.answer = rows.findIndex(function (row) {
+          return row.radio.checked;
+        });
+        if (
+          q.answer < 0 ||
+          q.options.some(function (option) {
+            return !option;
+          }) ||
+          new Set(q.options).size !== q.options.length
+        )
+          throw new Error('Preencha alternativas diferentes e marque a resposta correta.');
+      } else {
+        if (!/^-?\d+(?:[.,]\d+)?$/.test(answer.value.trim()))
+          throw new Error('Informe um gabarito numérico válido.');
+        q.answer = Number(answer.value.replace(',', '.'));
+      }
       if (seed && seed.footballToken) q.footballToken = seed.footballToken;
       return q;
     };
     if (seed) {
       prompt.value = seed.prompt || '';
       type.value = seed.type || 'numeric';
-      options.value = (seed.options || []).join('\n');
-      answer.value =
-        seed.answer === undefined
-          ? ''
-          : String(seed.type === 'choice' ? seed.answer + 1 : seed.answer);
+      if (seed.type !== 'choice' && seed.answer !== undefined) answer.value = String(seed.answer);
       explanation.value = seed.explanation || '';
-      type.dispatchEvent(new Event('change'));
     }
-    button(box, 'REMOVER QUESTÃO', function () {
-      box.remove();
-    });
+    type.dispatchEvent(new Event('change'));
+
+    if (removable)
+      button(box, 'REMOVER QUESTÃO', function () {
+        box.remove();
+        numberQuestions();
+      });
     if (replace) first.replaceWith(box);
     else editors.append(box);
+    numberQuestions();
     if (focus) {
       box.scrollIntoView({ behavior: 'smooth', block: 'start' });
       prompt.focus({ preventScroll: true });
     }
+    return box;
   }
   function renderSportsData(parent, data) {
     if (!data) return;
@@ -385,13 +871,163 @@
       parent.append(card);
     });
   }
+  function addCopyForm(parent, path, sourceId, questionIndex, controls = parent) {
+    var picker = node('div', undefined, 'class-panel');
+    picker.hidden = true;
+    var message = node('p');
+    message.setAttribute('role', 'status');
+    var select = node('select');
+    select.setAttribute('aria-label', 'Turma de destino');
+    var submit = button(
+      picker,
+      'COPIAR PARA A TURMA',
+      async function () {
+        if (!select.value) {
+          message.textContent = 'Selecione uma turma de destino.';
+          select.focus();
+          return;
+        }
+        var result = await api(path + '/copy', 'POST', {
+          targetClassId: select.value,
+          questionIndex: questionIndex,
+        });
+        message.textContent = result.copied
+          ? 'Rascunho criado em ' + select.selectedOptions[0].textContent + '.'
+          : 'Já existe uma cópia nessa turma.';
+      },
+      true,
+    );
+    picker.prepend(select);
+    picker.append(message);
+    button(
+      controls,
+      questionIndex === undefined ? 'COPIAR ATIVIDADE' : 'COPIAR QUESTÃO',
+      async function () {
+        if (!picker.hidden) {
+          picker.hidden = true;
+          return;
+        }
+        var classes = (await api('/classes')).classes.filter(function (c) {
+          return questionIndex !== undefined || c.id !== sourceId;
+        });
+        var placeholder = node('option', 'Selecione uma turma');
+        placeholder.value = '';
+        select.replaceChildren(placeholder);
+        classes.forEach(function (c) {
+          var option = node('option', c.name);
+          option.value = c.id;
+          select.append(option);
+        });
+        message.textContent = classes.length ? '' : 'Crie outra turma para copiar esta atividade.';
+        submit.hidden = !classes.length;
+        picker.hidden = false;
+        select.focus();
+      },
+    );
+    parent.append(picker);
+  }
+  async function showQuestions() {
+    var list = el('teacherQuestions');
+    var questions = (await api('/classes/questions')).questions;
+    list.hidden = false;
+    list.replaceChildren();
+    el('classGreeting').textContent = 'Minhas questões';
+    el('classIntro').textContent = 'Edite, exclua ou copie suas questões para outra turma.';
+    setNavigation(false);
+    if (!questions.length)
+      list.append(node('p', 'As questões das atividades que você criar aparecem aqui.'));
+    questions.forEach(function (question) {
+      var card = node('article', undefined, 'class-card');
+      var row = node('div', undefined, 'question-row');
+      var summary = node('div', undefined, 'question-summary');
+      var controls = node('div', undefined, 'question-controls');
+      summary.append(
+        node('h2', question.prompt),
+        node('p', question.activityTitle + ' · ' + question.className),
+        node('p', question.type === 'choice' ? 'Múltipla escolha' : 'Resposta numérica'),
+      );
+      row.append(summary, controls);
+      card.append(row);
+      var path = '/classes/' + question.classId + '/activities/' + question.activityId;
+      var editPath = path + '/library/' + question.index;
+      var editor = node('form');
+      editor.hidden = true;
+      button(controls, 'EDITAR', async function () {
+        if (!editor.hidden) return;
+        var activity = await api(path);
+        var original = activity.questions[question.index];
+        var saved = activity.libraryQuestions?.[question.index] || original;
+        editor.replaceChildren(node('p', 'As alterações valem para novas cópias da questão.'));
+        var fields = node('div');
+        editor.append(fields);
+        var questionEditor = addQuestion(
+          Object.assign({}, saved, { sportsData: original.sportsData }),
+          {
+            editors: fields,
+            focus: false,
+            removable: false,
+          },
+        );
+        var save = node('button', 'SALVAR', 'primary-button');
+        save.type = 'submit';
+        editor.append(save);
+        button(editor, 'CANCELAR', function () {
+          editor.hidden = true;
+        });
+        editor.onsubmit = async function (event) {
+          event.preventDefault();
+          save.disabled = true;
+          try {
+            await api(editPath, 'PATCH', { question: questionEditor.readQuestion() });
+            await showQuestions();
+            feedback('Questão atualizada na biblioteca.');
+          } catch (error) {
+            feedback(error.message, true);
+          } finally {
+            save.disabled = false;
+          }
+        };
+        editor.hidden = false;
+        questionEditor.querySelector('textarea').focus();
+      });
+      button(controls, 'EXCLUIR', async function () {
+        if (
+          !window.confirm(
+            'Excluir esta questão da biblioteca? As atividades que já a usam serão mantidas.',
+          )
+        )
+          return;
+        await api(editPath, 'PATCH', { question: null });
+        await showQuestions();
+        feedback('Questão excluída da biblioteca.');
+      });
+      addCopyForm(card, path, question.classId, question.index, controls);
+      card.append(editor);
+      list.append(card);
+    });
+  }
+
   async function openActivity(id) {
     var path = '/classes/' + currentClass.id + '/activities/' + id,
       a = await api(path),
       panel = el('activityView');
+    if (user.role === 'aluno' && !a.submission) {
+      if (a.deadlineAt && a.locked) throw new Error('O tempo desta atividade acabou.');
+      if (
+        a.durationMinutes &&
+        !a.deadlineAt &&
+        !window.confirm('Você terá ' + a.durationMinutes + ' min após iniciar. Começar agora?')
+      )
+        return;
+      await api(path + '/start', 'POST');
+      if (a.durationMinutes) a = await api(path);
+      if (a.locked) throw new Error('O tempo desta atividade acabou.');
+      if (!currentClass || path !== '/classes/' + currentClass.id + '/activities/' + id) return;
+    }
     panel.hidden = false;
     panel.replaceChildren(node('h2', a.title));
     if (user.role === 'professor') {
+      addCopyForm(panel, path, currentClass.id);
       a.questions.forEach(function (q, i) {
         var b = node('div', undefined, 'class-question');
         b.append(node('h3', 'Questão ' + (i + 1)), node('p', q.prompt));
@@ -450,6 +1086,23 @@
       send.type = 'submit';
       formEl.append(send);
       panel.append(formEl);
+      if (a.deadlineAt) {
+        var timer = node('p');
+        formEl.prepend(timer);
+        function updateTimer() {
+          if (!timer.isConnected) return;
+          var seconds = Math.max(0, Math.ceil((a.deadlineAt - Date.now()) / 1000));
+          timer.textContent = seconds
+            ? 'Tempo restante: ' +
+              Math.floor(seconds / 60) +
+              ':' +
+              String(seconds % 60).padStart(2, '0')
+            : 'Tempo esgotado.';
+          if (seconds) setTimeout(updateTimer, 1000);
+          else send.disabled = true;
+        }
+        updateTimer();
+      }
       formEl.addEventListener('submit', async function (e) {
         e.preventDefault();
         send.disabled = true;
@@ -464,7 +1117,7 @@
         } catch (err) {
           feedback(err.message, true);
         } finally {
-          send.disabled = false;
+          send.disabled = Boolean(a.deadlineAt && a.deadlineAt <= Date.now());
         }
       });
     }
@@ -528,9 +1181,17 @@
       user = (await api('/dashboard')).user;
       var teacher = user.role === 'professor';
       el('classTrailLink').hidden = teacher;
-      document.title = teacher ? 'Painel do professor | MathStats' : 'Turmas | MathStats';
+      el('teacherQuestionsLink').hidden = !teacher;
+      if (teacher && location.pathname === '/professor/questoes') {
+        document.title = 'Minhas questões | MathStats';
+        await showQuestions();
+        return;
+      }
+      var dashboard = teacher && location.pathname === '/professor';
+      document.title = dashboard ? 'Painel do professor | MathStats' : 'Turmas | MathStats';
       el('classGreeting').textContent =
-        (teacher ? 'Bem-vindo, ' : 'Suas turmas, ') + user.displayName;
+        (dashboard ? 'Bem-vindo, ' : 'Suas turmas, ') + user.displayName;
+      el('newClassButton').hidden = !teacher || dashboard;
       el('classEyebrow').textContent = teacher ? 'ÁREA DO PROFESSOR' : 'APRENDIZAGEM EM TURMA';
       el('classCreate').hidden = true;
       el('classJoin').hidden = teacher;
@@ -596,6 +1257,7 @@
     el('className').focus({ preventScroll: true });
   }
   action(el('welcomeCreateClass'), showCreateClass);
+  action(el('newClassButton'), showCreateClass);
   action(el('welcomePrepareActivity'), function () {
     if (!el('activityClass').options.length) {
       showCreateClass();
@@ -696,10 +1358,6 @@
     });
     await openClass(currentClass.id);
     feedback('Atividade salva. Revise as questões e publique quando estiver pronta.');
-  });
-  action(el('classLogout'), async function () {
-    await api('/logout', 'POST', {});
-    location.href = '/login';
   });
   init();
 })();
