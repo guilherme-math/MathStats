@@ -25,13 +25,26 @@
       <div class="mesh-axis"></div>
     </div>
     <header class="auth-topbar">
-      <div class="auth-topbar-inner">
+      <div class="auth-topbar-inner dashboard-topbar-inner legal-topbar-inner">
         <a class="brand" href="/"
           ><span class="brand-mark">M<span>Σ</span></span
           ><span class="brand-copy"
             ><strong>MATH<span>/</span>STATS</strong><small>PRIVACIDADE E DADOS</small></span
           ></a
-        ><button class="theme-toggle" id="themeToggle" type="button" aria-label="Ativar modo claro">
+        >
+        <nav id="legalPublicNav" class="dashboard-nav" aria-label="Navegação principal">
+          <a href="/">INÍCIO</a>
+          <a href="/termos-de-uso">TERMOS</a>
+          <a href="/politica-de-privacidade" class="is-active" aria-current="page">PRIVACIDADE</a>
+          <a href="/login">ENTRAR</a>
+        </nav>
+        <nav id="legalAccountNav" class="dashboard-nav" aria-label="Navegação principal" hidden>
+          <a href="/dashboard">PAINEL</a>
+          <a id="legalTrailLink" href="/desafio">TRILHA</a>
+          <a href="/turmas">TURMAS</a>
+          <a href="/conta">CONTA</a>
+        </nav>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Ativar modo claro">
           <svg class="moon-icon" viewBox="0 0 24 24">
             <path d="M20 15.5A8.4 8.4 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5z"></path></svg
           ><svg class="sun-icon" viewBox="0 0 24 24">
@@ -138,10 +151,10 @@
         </p>
         <p>
           Conta, progresso e histórico permanecem enquanto a conta estiver ativa. Códigos de
-          autenticação e recuperação expiram em 15 minutos, sessões expiram após 15 minutos de
-          inatividade e registros de auditoria possuem retenção de 180 dias. Na exclusão da conta,
-          os dados da conta e suas subcoleções são removidos e os registros remanescentes de
-          auditoria são anonimizados.
+          autenticação e recuperação expiram em 15 minutos. A sessão pode permanecer ativa por até
+          30 dias após o login e é encerrada quando o usuário clica em Sair. Registros de auditoria
+          possuem retenção de 180 dias. Na exclusão da conta, os dados da conta e suas subcoleções
+          são removidos e os registros remanescentes de auditoria são anonimizados.
         </p>
       </section>
       <section class="legal-card">

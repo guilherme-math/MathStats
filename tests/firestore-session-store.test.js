@@ -70,6 +70,17 @@ test('sessão no Firestore suporta gravação, leitura, renovação e exclusão'
     collection.documents.get('session-1').expiresAt.toDate().getTime() > previousExpiration,
   );
 
+  const authenticatedUntil = Date.now() + 30 * 24 * 60 * 60 * 1000;
+  sessionData.authenticatedUntil = authenticatedUntil;
+  sessionData.cookie.expires = new Date(authenticatedUntil);
+  await callStore(store, 'set', 'session-1', sessionData);
+  sessionData.cookie.expires = new Date(authenticatedUntil + 60_000);
+  await callStore(store, 'touch', 'session-1', sessionData);
+  assert.equal(
+    collection.documents.get('session-1').expiresAt.toDate().getTime(),
+    authenticatedUntil,
+  );
+
   await callStore(store, 'destroy', 'session-1');
   assert.equal(await callStore(store, 'get', 'session-1'), null);
 });

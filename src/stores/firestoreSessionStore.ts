@@ -1,11 +1,16 @@
 import session from 'express-session';
 import { db } from '../config/firebase';
+import type { AppSession } from '../types/session';
 
 const DEFAULT_TTL_MS = 15 * 60 * 1000;
 
 function expirationDate(sessionData: session.SessionData): Date {
   const expires = sessionData.cookie.expires;
-  return expires ? new Date(expires) : new Date(Date.now() + DEFAULT_TTL_MS);
+  const cookieExpiration = expires ? new Date(expires).getTime() : Date.now() + DEFAULT_TTL_MS;
+  const authenticatedUntil = (
+    sessionData as session.SessionData & Pick<AppSession, 'authenticatedUntil'>
+  ).authenticatedUntil;
+  return new Date(Math.min(cookieExpiration, authenticatedUntil ?? cookieExpiration));
 }
 
 export class FirestoreSessionStore extends session.Store {

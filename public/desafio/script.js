@@ -8,9 +8,14 @@
     facil: 'Fácil',
     media: 'Média',
     avancada: 'Avançada',
+    soma: 'Soma e subtração',
+    multiplicacao: 'Multiplicação e divisão',
+    medias: 'Média',
+    fracoes: 'Frações',
   };
   var trail = Object.hasOwn(trailLabels, requestedTrail) ? requestedTrail : null;
-  var TOTAL_CHALLENGES = trail === 'diagnostico' ? 5 : 10;
+  var shortTrails = ['diagnostico', 'medias', 'fracoes'];
+  var TOTAL_CHALLENGES = shortTrails.includes(trail) ? 5 : 10;
   var trailProgress = {};
   var state = {
     index: 0,
@@ -708,12 +713,6 @@
   el('dashboardBtn').addEventListener('click', function () {
     window.location.href = '/dashboard';
   });
-  el('logoutBtn').addEventListener('click', async function () {
-    try {
-      await fetch('/api/logout', { method: 'POST' });
-    } catch (error) {}
-    window.location.href = '/login';
-  });
   var savedTheme = 'dark';
   try {
     savedTheme = localStorage.getItem('mathstats-theme') || 'dark';
@@ -772,7 +771,8 @@
           item.className = card.className;
           item.append(...card.children);
           var stats = document.createElement('p');
-          stats.textContent = progress.correct + '/10 acertos · ' + progress.xp + ' XP';
+          stats.textContent =
+            progress.correct + '/' + progress.answered.length + ' acertos · ' + progress.xp + ' XP';
           item.querySelector('.trail-hub-copy').appendChild(stats);
           var restart = document.createElement('button');
           restart.type = 'button';

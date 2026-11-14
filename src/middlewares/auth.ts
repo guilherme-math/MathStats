@@ -8,7 +8,9 @@ export async function validateSession(req: Request, res: Response, next: NextFun
   const session = req.session as AppSession;
   if (!session.userId) return next();
   try {
-    const user = await UserModel.findById(session.userId);
+    const expired =
+      session.authenticatedUntil !== undefined && session.authenticatedUntil <= Date.now();
+    const user = expired ? null : await UserModel.findById(session.userId);
     if (user && !user.deleting && session.credentialFingerprint === credentialFingerprint(user)) {
       session.role = user.role;
       return next();
@@ -33,6 +35,7 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
 }
 
 export function requirePageAuth(req: Request, res: Response, next: NextFunction) {
+  res.set('Cache-Control', 'private, no-store');
   if (!(req.session as AppSession).userId) return res.redirect('/login');
   next();
 }
@@ -50,6 +53,7 @@ export function requireRole(...allowedRoles: UserRole[]) {
 
 export function requirePageRole(...allowedRoles: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction) => {
+    res.set('Cache-Control', 'private, no-store');
     const session = req.session as AppSession;
     if (!session.userId) return res.redirect('/login');
     if (!session.role || !allowedRoles.includes(session.role))

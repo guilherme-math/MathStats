@@ -233,6 +233,17 @@
     } catch (error) {}
   }
 
+  async function initLegalNavigation() {
+    try {
+      var result = await requestJson('/api/session');
+      var role = result.data.role;
+      if (!result.response.ok || (role !== 'aluno' && role !== 'professor')) return;
+      el('legalTrailLink').hidden = role !== 'aluno';
+      el('legalPublicNav').hidden = true;
+      el('legalAccountNav').hidden = false;
+    } catch (error) {}
+  }
+
   async function initGoogle() {
     var container = el('google-signin-btn');
     if (!container) return;
@@ -761,13 +772,6 @@
     });
   }
 
-  async function logout() {
-    try {
-      await requestJson('/api/logout', { method: 'POST' });
-    } catch (error) {}
-    window.location.href = '/login';
-  }
-
   function renderLogs(logs) {
     var container = el('logsContent');
     container.replaceChildren();
@@ -1096,11 +1100,9 @@
         return;
       }
       currentUser = session.data.user;
+      el('accountTrailLink').hidden = currentUser.role !== 'aluno';
+      el('accountQuestionsLink').hidden = currentUser.role !== 'professor';
       if (currentUser.role === 'professor') {
-        document.querySelectorAll('a[href="/desafio"]').forEach(function (link) {
-          link.href = '/professor';
-          link.textContent = 'TURMAS';
-        });
         ['profileXp', 'profileLevel', 'profileStreak'].forEach(function (id) {
           var field = el(id);
           if (field) field.parentElement.hidden = true;
@@ -1314,8 +1316,6 @@
       });
     }
 
-    if (el('logoutBtn')) el('logoutBtn').addEventListener('click', logout);
-
     if (el('profileCorrectionForm'))
       el('profileCorrectionForm').addEventListener('submit', async function (event) {
         event.preventDefault();
@@ -1510,4 +1510,5 @@
   if (page === 'recover') initRecover();
   if (page === 'dashboard') initDashboard();
   if (page === 'account') initAccount();
+  if (page === 'legal') initLegalNavigation();
 })();

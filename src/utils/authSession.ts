@@ -3,6 +3,8 @@ import type { Request } from 'express';
 import type { User } from '../models/userModel';
 import type { AppSession } from '../types/session';
 
+const AUTHENTICATED_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+
 export function credentialFingerprint(user: User): string {
   const secret = process.env.SESSION_SECRET;
   if (!secret) throw new Error('SESSION_SECRET não configurado.');
@@ -32,6 +34,8 @@ export async function authenticateSession(req: Request, user: User): Promise<voi
   session.username = user.username;
   session.role = user.role;
   session.credentialFingerprint = credentialFingerprint(user);
+  session.authenticatedUntil = Date.now() + AUTHENTICATED_SESSION_MS;
+  session.cookie.expires = new Date(session.authenticatedUntil);
 }
 
 export function hasCurrentMfa(session: AppSession, user: User): boolean {

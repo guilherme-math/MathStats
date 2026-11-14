@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/authController';
 import { RecoveryController } from '../controllers/recoveryController';
+import type { AppSession } from '../types/session';
 import {
   loginLimiter,
   mfaLimiter,
@@ -25,6 +26,10 @@ import {
 const router = Router();
 
 router.get('/config/public', AuthController.publicConfig);
+router.get('/session', (req, res) => {
+  const session = req.session as AppSession;
+  res.json({ role: session.userId ? (session.role ?? null) : null });
+});
 router.post('/signup', signupLimiter, validateBody(signupSchema), AuthController.signup);
 router.post('/login', loginLimiter, validateBody(loginSchema), AuthController.login);
 router.post('/verify-token', mfaLimiter, validateBody(mfaSchema), AuthController.verifyToken);

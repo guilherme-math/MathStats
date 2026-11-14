@@ -6,6 +6,7 @@ export type AppSession = Session & {
   username?: string;
   role?: UserRole;
   credentialFingerprint?: string;
+  authenticatedUntil?: number;
   pendingCredentialFingerprint?: string;
   pending2faExpires?: number;
   pending2faUserId?: string;

@@ -1,4 +1,13 @@
-export const trailLengths = { diagnostico: 5, facil: 10, media: 10, avancada: 10 } as const;
+export const trailLengths = {
+  diagnostico: 5,
+  facil: 10,
+  media: 10,
+  avancada: 10,
+  soma: 10,
+  multiplicacao: 10,
+  medias: 5,
+  fracoes: 5,
+} as const;
 export type TrailId = keyof typeof trailLengths;
 export type TrailProgress = Partial<
   Record<TrailId, Record<string, { correct: boolean; xp: number }>>

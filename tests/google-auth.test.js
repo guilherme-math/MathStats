@@ -53,7 +53,7 @@ test('login com Google verificado conclui a sessão sem exigir 2FA adicional', a
     socket: {},
   };
   request.session.regenerate = (done) => {
-    request.session = {};
+    request.session = { cookie: {} };
     done();
   };
   const response = responseMock();

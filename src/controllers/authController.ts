@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type { RateLimitInfo } from 'express-rate-limit';
 import argon2 from 'argon2';
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
@@ -199,9 +200,19 @@ export const AuthController = {
           ip: getIp(req),
           detail: 'Tentativa de login com credenciais inválidas',
         });
-        return res
-          .status(401)
-          .json({ error: 'Usuário ou senha incorretos. Verifique os dados e tente novamente.' });
+        const limit = (req as Request & { rateLimit?: RateLimitInfo }).rateLimit;
+        const error = 'Usuário ou senha incorretos.';
+        if (!limit || limit.used < 3)
+          return res.status(401).json({ error: error + ' Verifique os dados e tente novamente.' });
+
+        const remaining = limit.remaining;
+        const message =
+          remaining === 0
+            ? ' Você atingiu o limite. Aguarde o fim do bloqueio de 15 minutos.'
+            : remaining === 1
+              ? ' Resta 1 tentativa.'
+              : ` Restam ${remaining} tentativas.`;
+        return res.status(401).json({ error: error + message, remainingAttempts: remaining });
       }
 
       await audit({
@@ -653,14 +664,19 @@ export const AuthController = {
     const session = getSession(req);
     const userId = session.userId;
     const username = session.username;
-    audit({
-      event: 'LOGOUT',
-      userId,
-      username,
-      ip: getIp(req),
-      detail: 'Sessão encerrada pelo usuário',
-    }).catch(() => {});
-    req.session.destroy(() => {
+    req.session.destroy((error) => {
+      if (error) {
+        return res
+          .status(503)
+          .json({ error: 'Não foi possível encerrar a sessão. Tente novamente.' });
+      }
+      audit({
+        event: 'LOGOUT',
+        userId,
+        username,
+        ip: getIp(req),
+        detail: 'Sessão encerrada pelo usuário',
+      }).catch(() => {});
       res.clearCookie(process.env.SESSION_COOKIE_NAME || 'mathstats.sid', {
         secure: true,
         httpOnly: true,

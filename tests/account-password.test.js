@@ -49,6 +49,7 @@ test('titular troca a própria senha ao confirmar a senha atual', async () => {
           userId: 'user-1',
           regenerate(done) {
             for (const key of Object.keys(this)) if (key !== 'regenerate') delete this[key];
+            this.cookie = {};
             done();
           },
         },

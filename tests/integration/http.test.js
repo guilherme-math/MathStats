@@ -834,6 +834,26 @@ test('professor escolhe uma turma para copiar atividade ou questão como rascunh
   assert.equal(original.body.questions[0].prompt, 'Quanto é 2 + 3?');
 });
 
+test('trilhas por assunto usam placares reais e respeitam o total de questões', async () => {
+  const { challengeGenerationLimiter } = require('../../dist/middlewares/security');
+  await challengeGenerationLimiter.resetKey('127.0.0.1');
+  await seedCompletedTutorial();
+  for (const [trail, total] of [
+    ['soma', 10],
+    ['multiplicacao', 10],
+    ['medias', 5],
+    ['fracoes', 5],
+  ]) {
+    const url = '/api/desafio?trilha=' + trail + '&indice=';
+    const response = await client.get(url + total).set('Cookie', cookie);
+    assert.equal(response.status, 200);
+    assert.equal(response.body.contexto, 'Dados reais da API-Football');
+    assert.equal(response.body.tabela.rows.length, 5);
+    assert.equal(response.body.respostaCorreta, undefined);
+    assert.equal((await client.get(url + (total + 1)).set('Cookie', cookie)).status, 400);
+  }
+});
+
 test('agendamento e limite por aluno são aplicados no servidor', async () => {
   const teacher = await classroomAccount('professor');
   const created = await client

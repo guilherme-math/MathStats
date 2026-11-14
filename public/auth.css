@@ -354,6 +354,9 @@ input {
 .input-wrap input {
   padding-right: 54px;
 }
+.input-wrap input[type='password']::-ms-reveal {
+  display: none;
+}
 .eye-button {
   position: absolute;
   right: 0;
@@ -803,7 +806,7 @@ button:disabled {
 
 body:not([data-page='dashboard']):not([data-page='account']):not([data-page='legal']):not(
     [data-page='classes']
-  ) {
+  ):not([data-page='register']) {
   height: 100dvh;
   min-height: 100dvh;
   display: grid;
@@ -1003,7 +1006,7 @@ body:not([data-page='dashboard']):not([data-page='account']):not([data-page='leg
   width: 100%;
   padding: 13px;
   margin-bottom: 14px;
-  background: var(--input-bg, #151e19);
+  background: var(--bg-elevated);
   color: var(--text-primary);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1124,21 +1127,33 @@ body[data-page='legal'] {
 body[data-page='register'] {
   height: auto;
   min-height: 100dvh;
-  grid-template-rows: auto minmax(min-content, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
 }
 body[data-page='register'] .auth-shell {
+  flex: 1 0 auto;
+  max-width: 1320px;
   height: auto;
-  min-height: calc(100dvh - 140px);
+  min-height: 0;
   padding-top: 34px;
   padding-bottom: 34px;
+}
+body[data-page='register'] .auth-topbar-inner,
+body[data-page='register'] .site-footer-inner {
+  max-width: 1320px;
+}
+@media (min-width: 901px) {
+  body[data-page='register'] .auth-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(460px, 560px);
+  }
 }
 
 @media (max-width: 900px) {
   body:not([data-page='dashboard']):not([data-page='account']):not([data-page='legal']):not(
       [data-page='classes']
-    ) {
+    ):not([data-page='register']) {
     height: auto;
     min-height: 100vh;
     display: block;
@@ -1195,7 +1210,7 @@ body[data-page='register'] .auth-shell {
 @media (max-height: 760px) and (min-width: 901px) {
   body:not([data-page='dashboard']):not([data-page='account']):not([data-page='legal']):not(
       [data-page='classes']
-    ) {
+    ):not([data-page='register']) {
     height: auto;
     min-height: 100vh;
     overflow: auto;
@@ -1253,6 +1268,45 @@ body[data-page='register'] .auth-shell {
 }
 .dashboard-nav a:hover {
   color: var(--accent-bright);
+}
+.dashboard-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+.header-logout {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+.header-logout:hover {
+  border-color: var(--accent);
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+}
+@media (max-width: 900px) {
+  .dashboard-topbar-inner:has(.dashboard-header-actions),
+  .legal-topbar-inner {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding-block: 8px;
+  }
+  .dashboard-topbar-inner:has(.dashboard-header-actions) .dashboard-nav,
+  .legal-topbar-inner .dashboard-nav {
+    display: flex;
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+    order: 1;
+    gap: 16px;
+  }
 }
 .dashboard-hero {
   display: flex;

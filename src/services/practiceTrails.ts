@@ -230,16 +230,28 @@ const advanced: Exercise[] = [
 
 const catalogs = { facil: easy, media: medium, avancada: advanced } as const;
 const labels = { facil: 'Fácil', media: 'Médio', avancada: 'Avançado' } as const;
-export type PracticeTrail = keyof typeof catalogs;
+const topics = {
+  soma: 'Soma e subtração',
+  multiplicacao: 'Multiplicação e divisão',
+  medias: 'Média',
+  fracoes: 'Frações',
+} as const;
+type Topic = keyof typeof topics;
+export type PracticeTrail = keyof typeof catalogs | Topic;
+
+function isTopic(value: string): value is Topic {
+  return Object.hasOwn(topics, value);
+}
 
 export function isPracticeTrail(value: unknown): value is PracticeTrail {
-  return typeof value === 'string' && Object.hasOwn(catalogs, value);
+  return typeof value === 'string' && (Object.hasOwn(catalogs, value) || isTopic(value));
 }
 
 export function buildPracticeChallenge(
   trail: PracticeTrail,
   index: number,
 ): ChallengeDefinition | null {
+  if (isTopic(trail)) return null;
   const exercise = catalogs[trail][index - 1];
   if (!exercise) return null;
   const [titulo, pergunta, respostaCorreta, explicacao, hint] = exercise;
@@ -305,6 +317,7 @@ export async function buildSportsPractice(
   trail: PracticeTrail,
   index: number,
 ): Promise<ChallengeDefinition | null> {
+  if (isTopic(trail)) return buildTopicChallenge(trail, index);
   const base = buildPracticeChallenge(trail, index);
   if (!base) return null;
   const club =
@@ -391,7 +404,7 @@ export async function buildSportsPractice(
     const draws = games.filter((game) => game.gols === game.golsAdversario).length;
     const withGoals = games.filter((game) => game.gols > 0).length;
     const median = [...games].sort((x, y) => x.gols - y.gols)[2].gols;
-    const exercises: Record<PracticeTrail, Exercise[]> = {
+    const exercises: Record<keyof typeof catalogs, Exercise[]> = {
       facil: [
         [
           'Total nos dois primeiros jogos',
@@ -488,4 +501,79 @@ export async function buildSportsPractice(
   } catch {
     return fallback();
   }
+}
+
+async function buildTopicChallenge(trail: Topic, index: number): Promise<ChallengeDefinition> {
+  const club = clubs[(index - 1) % clubs.length];
+  const season = 2024;
+  const games = await getRecentTeamMatches(club.id, season);
+  if (games.length < 5) {
+    throw Object.assign(new Error('Partidas insuficientes para montar a questão.'), {
+      statusCode: 503,
+    });
+  }
+  const rows = games.slice(0, 5);
+  const goals = rows.reduce((sum, game) => sum + game.gols, 0);
+  const conceded = rows.reduce((sum, game) => sum + game.golsAdversario, 0);
+  const wins = rows.filter((game) => game.gols > game.golsAdversario).length;
+  const draws = rows.filter((game) => game.gols === game.golsAdversario).length;
+  const scoringMatches = rows.filter((game) => game.gols > 0).length;
+  let pergunta: string;
+  let explicacao: string;
+  let respostaCorreta: number;
+  let options: string[] | undefined;
+  let fractionAnswer: string | undefined;
+  if (trail === 'soma') {
+    const sum = index <= 5;
+    respostaCorreta = sum ? goals + conceded : goals - conceded;
+    pergunta = sum
+      ? 'Quantos gols foram marcados pelos dois lados nas cinco partidas?'
+      : 'Qual foi o saldo de gols do clube nas cinco partidas?';
+    explicacao = `${goals} ${sum ? '+' : '−'} ${conceded} = ${respostaCorreta}.`;
+  } else if (trail === 'multiplicacao' && index <= 5) {
+    respostaCorreta = wins * 3;
+    pergunta = 'Cada vitória vale 3 pontos. Quantos pontos vieram somente das vitórias?';
+    explicacao = `${wins} × 3 = ${respostaCorreta}.`;
+  } else if (trail === 'multiplicacao') {
+    const points = wins * 3 + draws;
+    respostaCorreta = points / 5;
+    pergunta = `O clube somou ${points} pontos nesses jogos. Divida esse total por 5. Qual é o resultado?`;
+    explicacao = `${points} ÷ 5 = ${respostaCorreta.toLocaleString('pt-BR')}.`;
+  } else if (trail === 'medias') {
+    respostaCorreta = goals / 5;
+    pergunta = 'Qual foi a média de gols marcados pelo clube por partida?';
+    explicacao = `Some os gols marcados e divida pelo número de partidas: ${goals} ÷ 5 = ${respostaCorreta.toLocaleString('pt-BR')}.`;
+  } else {
+    respostaCorreta = 0;
+    pergunta =
+      'Que fração das cinco partidas teve pelo menos um gol marcado pelo clube? Use 5 como denominador.';
+    fractionAnswer = `${scoringMatches}/5`;
+    options = Array.from({ length: 6 }, (_, n) => `${n}/5`);
+    explicacao = `Em ${scoringMatches} das 5 partidas o clube marcou. A fração é ${fractionAnswer}.`;
+  }
+  return {
+    tipo: options ? 'multiple-choice' : 'numeric',
+    tipoDesafio: `pratica_${trail}_${index}`,
+    categoria: topics[trail],
+    dificuldade: 'Fácil',
+    titulo: topics[trail],
+    contexto: 'Dados reais da API-Football',
+    historia: `Cinco partidas finalizadas de ${club.name} na temporada ${season}.`,
+    pergunta,
+    respostaCorreta: fractionAnswer ?? respostaCorreta,
+    explicacao,
+    dicas: ['Consulte a tabela e identifique os valores pedidos no enunciado.'],
+    xp: 10,
+    placeholder: 'Digite sua resposta numérica',
+    options,
+    tabela: {
+      headers: ['Jogo', 'Adversário', 'Gols marcados', 'Gols sofridos'],
+      rows: rows.map((game, i) => [
+        String(i + 1),
+        game.adversario,
+        String(game.gols),
+        String(game.golsAdversario),
+      ]),
+    },
+  };
 }

@@ -28,10 +28,10 @@ export const gerarDesafio = async (req: Request, res: Response) => {
     if (trail !== 'diagnostico' && !isPracticeTrail(trail)) {
       return res.status(400).json({ erro: 'Trilha inválida.' });
     }
-    const total = trail === 'diagnostico' ? 5 : 10;
+    const total = trailLengths[trail];
     const indexSchema = trail === 'diagnostico' ? challengeIndexSchema : practiceIndexSchema;
     const parsedIndex = indexSchema.safeParse(req.query.indice);
-    if (!parsedIndex.success) {
+    if (!parsedIndex.success || parsedIndex.data > total) {
       return res.status(400).json({ erro: `O índice do desafio deve estar entre 1 e ${total}.` });
     }
     const session = req.session as AppSession;

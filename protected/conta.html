@@ -38,7 +38,8 @@
         </a>
         <nav class="dashboard-nav" aria-label="Navegação principal">
           <a href="/dashboard">PAINEL</a>
-          <a href="/desafio">TRILHA</a>
+          <a id="accountTrailLink" href="/desafio" hidden>TRILHA</a>
+          <a id="accountQuestionsLink" href="/professor/questoes" hidden>QUESTÕES</a>
           <a href="/turmas">TURMAS</a>
           <a class="is-active" href="/conta">CONTA</a>
         </nav>
@@ -311,5 +312,6 @@
       </div>
     </footer>
     <script src="/auth.js"></script>
+    <script src="/protected-session.js" defer></script>
   </body>
 </html>

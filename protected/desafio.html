@@ -53,6 +53,14 @@
               ><span aria-hidden="true">🔥</span> <span id="streakValue">0</span></strong
             ></span
           >
+        </div>
+        <nav class="topbar-nav" aria-label="Navegação principal">
+          <a class="top-link" href="/dashboard">PAINEL</a>
+          <a class="top-link" href="/desafio" aria-current="page">TRILHA</a>
+          <a class="top-link" href="/turmas">TURMAS</a>
+          <a class="top-link" href="/conta">CONTA</a>
+        </nav>
+        <div class="topbar-actions">
           <button
             class="theme-toggle"
             type="button"
@@ -72,12 +80,6 @@
           </button>
           <button class="logout-button" type="button" id="logoutBtn">SAIR</button>
         </div>
-        <nav class="topbar-nav" aria-label="Navegação principal">
-          <a class="top-link" href="/dashboard">PAINEL</a>
-          <a class="top-link" href="/desafio" aria-current="page">TRILHA</a>
-          <a class="top-link" href="/turmas">TURMAS</a>
-          <a class="top-link" href="/conta">CONTA</a>
-        </nav>
       </div>
     </header>
 
@@ -105,32 +107,41 @@
             </div>
             <strong class="trail-hub-cta">Começar tutorial</strong>
           </a>
-          <a class="trail-hub-card" href="/desafio?trilha=facil">
+          <a class="trail-hub-card" href="/desafio?trilha=soma">
             <span class="trail-hub-number" aria-hidden="true">01</span>
             <div class="trail-hub-copy">
-              <small>10 QUESTÕES · FÁCIL</small>
-              <h2>O básico do jogo</h2>
-              <p>Leia placares, some gols e calcule o saldo dos clubes.</p>
+              <small>10 QUESTÕES</small>
+              <h2>Soma e subtração</h2>
+              <p>Some gols e calcule o saldo pelos placares.</p>
             </div>
-            <strong class="trail-hub-cta">Praticar aritmética</strong>
+            <strong class="trail-hub-cta">Praticar</strong>
           </a>
-          <a class="trail-hub-card" href="/desafio?trilha=media">
+          <a class="trail-hub-card" href="/desafio?trilha=multiplicacao">
             <span class="trail-hub-number" aria-hidden="true">02</span>
             <div class="trail-hub-copy">
-              <small>10 QUESTÕES · MÉDIA</small>
-              <h2>De olho na tabela</h2>
-              <p>Combine as quatro operações para resolver problemas de pontuação e desempenho.</p>
+              <small>10 QUESTÕES</small>
+              <h2>Multiplicação e divisão</h2>
+              <p>Calcule pontos por vitória e divida os pontos pelas partidas.</p>
             </div>
-            <strong class="trail-hub-cta">Praticar operações</strong>
+            <strong class="trail-hub-cta">Praticar</strong>
           </a>
-          <a class="trail-hub-card" href="/desafio?trilha=avancada">
+          <a class="trail-hub-card" href="/desafio?trilha=medias">
             <span class="trail-hub-number" aria-hidden="true">03</span>
             <div class="trail-hub-copy">
-              <small>10 QUESTÕES · AVANÇADA</small>
-              <h2>Além do placar</h2>
-              <p>Compare médias, analise percentuais e calcule a trajetória de um chute.</p>
+              <small>5 QUESTÕES</small>
+              <h2>Média</h2>
+              <p>Calcule a média de gols por partida.</p>
             </div>
-            <strong class="trail-hub-cta">Praticar estatística e álgebra</strong>
+            <strong class="trail-hub-cta">Praticar</strong>
+          </a>
+          <a class="trail-hub-card" href="/desafio?trilha=fracoes">
+            <span class="trail-hub-number" aria-hidden="true">04</span>
+            <div class="trail-hub-copy">
+              <small>5 QUESTÕES</small>
+              <h2>Frações</h2>
+              <p>Represente em frações o desempenho dos clubes.</p>
+            </div>
+            <strong class="trail-hub-cta">Praticar</strong>
           </a>
         </div>
         <div class="trail-hub-grid" id="completedTrailList" hidden></div>
@@ -258,5 +269,6 @@
       </div>
     </footer>
     <script src="/desafio/script.js"></script>
+    <script src="/protected-session.js" defer></script>
   </body>
 </html>

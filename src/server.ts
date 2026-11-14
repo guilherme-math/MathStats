@@ -12,6 +12,7 @@ import dashboardRoutes from './routes/dashboardRoutes';
 import lgpdRoutes from './routes/lgpdRoutes';
 import challengeRoutes from './routes/challengeRoutes';
 import classRoutes from './routes/classRoutes';
+import type { AppSession } from './types/session';
 
 const app = express();
 const HTTP_PORT = Number(process.env.HTTP_PORT || 3000);
@@ -24,6 +25,12 @@ app.use('/api', dashboardRoutes);
 app.use('/api', lgpdRoutes);
 app.use('/api', challengeRoutes);
 app.use('/api', classRoutes);
+
+app.get('/', (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  if ((req.session as AppSession).userId) return res.redirect('/dashboard');
+  res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+});
 
 app.get(['/professor', '/professor/questoes'], requirePageRole('professor'), (_req, res) => {
   res.sendFile(path.join(process.cwd(), 'protected', 'turmas.html'));

@@ -59,7 +59,11 @@ export function applySecurityMiddlewares(app: express.Application) {
       req.path === '/api/classes' || req.path.startsWith('/api/classes/') ? classJson : defaultJson;
     parser(req, res, next);
   });
-  app.use(express.static(path.join(process.cwd(), 'public'), { redirect: false }));
+  app.use(express.static(path.join(process.cwd(), 'public'), { redirect: false, index: false }));
+  app.use('/api', (_req, res, next) => {
+    res.set('Cache-Control', 'private, no-store');
+    next();
+  });
 
   const sessionStore = process.env.NODE_ENV === 'test' ? undefined : new FirestoreSessionStore();
 
@@ -82,9 +86,12 @@ export function applySecurityMiddlewares(app: express.Application) {
 }
 
 export const loginLimiter = rateLimit({
-  store: process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('login'),
+  store:
+    process.env.NODE_ENV === 'test' ? undefined : new FirestoreRateLimitStore('login-failures'),
   windowMs: 15 * 60 * 1000,
   max: 5,
+  skipSuccessfulRequests: true,
+  requestWasSuccessful: (_req, res) => res.statusCode !== 401,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas tentativas de login. Aguarde 15 minutos antes de tentar novamente.' },
