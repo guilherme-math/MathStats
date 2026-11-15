@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run format:check && npm test",
-    "test:integration": "npm run build && node tests/integration/run.js"
+    "test:integration": "npm run build && node tests/integration/run.js",
+    "test:rpm": "npm run build && node tests/integration/run.js --load"
   },
   "dependencies": {
     "argon2": "^0.44.0",

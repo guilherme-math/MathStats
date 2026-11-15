@@ -53,8 +53,11 @@ npm run dev    inicia o servidor HTTPS local
 npm run build  compila o TypeScript
 npm test       compila e executa a suíte automatizada
 npm run test:coverage  exige no mínimo 50% de linhas, funções e ramificações cobertas
+npm run test:rpm       mede a carga local do painel e da lista de turmas
 npm start      executa a compilação local
 ```
+
+Os requisitos, o cenário e os resultados do teste de carga estão nos [testes de integração](tests/integration/README.md#teste-de-carga-local-rpm).
 
 ## Atendimento de solicitações de privacidade
 

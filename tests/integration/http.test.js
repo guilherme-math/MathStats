@@ -76,6 +76,7 @@ before(async () => {
   require('../../dist/utils/mailer').sendWelcomeEmail = async () => {};
   app.post('/api/signup', AuthController.signup);
   app.post('/api/login', AuthController.login);
+  app.post('/api/logout', AuthController.logout);
   app.post('/api/verify-token', AuthController.verifyToken);
   app.use('/api', require('../../dist/routes/challengeRoutes').default);
   app.use('/api', require('../../dist/routes/dashboardRoutes').default);
@@ -854,7 +855,7 @@ test('trilhas por assunto usam placares reais e respeitam o total de questões',
   }
 });
 
-test('agendamento e limite por aluno são aplicados no servidor', async () => {
+test('agendamento e limite por aluno são aplicados no servidor', async (t) => {
   const teacher = await classroomAccount('professor');
   const created = await client
     .post('/api/classes')
@@ -892,11 +893,12 @@ test('agendamento e limite por aluno são aplicados no servidor', async () => {
     });
   assert.equal(draft.status, 201);
   const route = base + '/activities/' + draft.body.id;
+  const opening = Date.now() + 3_600_000;
   const publish = await client
     .post(route + '/publish')
     .set('Cookie', teacher.cookie)
     .send({
-      opensAt: new Date(Date.now() + 3_600_000).toISOString(),
+      opensAt: new Date(opening).toISOString(),
       durationMinutes: 10,
     });
   assert.equal(publish.status, 200);
@@ -913,6 +915,15 @@ test('agendamento e limite por aluno são aplicados no servidor', async () => {
     .doc(created.body.id)
     .collection('activities')
     .doc(draft.body.id);
+  let testTime = opening - 1;
+  const clock = t.mock.method(Date, 'now', () => testTime);
+  try {
+    assert.equal((await client.get(route).set('Cookie', cookie)).status, 409);
+    testTime = opening;
+    assert.equal((await client.get(route).set('Cookie', cookie)).status, 200);
+  } finally {
+    clock.mock.restore();
+  }
   await ref.update({ opensAt: new Date(Date.now() - 60_000) });
   assert.deepEqual((await client.get(route).set('Cookie', cookie)).body.questions, []);
   assert.equal((await submit()).status, 409);
@@ -925,11 +936,156 @@ test('agendamento e limite por aluno são aplicados no servidor', async () => {
     (await client.get(route).set('Cookie', cookie)).body.deadlineAt,
     first.body.deadlineAt,
   );
+  const atDeadline = t.mock.method(Date, 'now', () => first.body.deadlineAt);
+  try {
+    assert.equal((await submit()).status, 409);
+  } finally {
+    atDeadline.mock.restore();
+  }
   await ref
     .collection('starts')
     .doc(user.id)
     .update({ startedAt: new Date(Date.now() - 11 * 60_000) });
-  assert.equal((await submit()).status, 409);
   const progress = await client.get(base + '/progress').set('Cookie', teacher.cookie);
   assert.deepEqual(progress.body.activities[0].expiredIds, [user.id]);
 });
+
+test('convite de seis dígitos é reutilizado durante a validade e expira sem afetar o link', async () => {
+  const teacher = await classroomAccount('professor');
+  const otherTeacher = await classroomAccount('professor');
+  const student = await classroomAccount('aluno');
+  const anotherStudent = await classroomAccount('aluno');
+
+  const created = await client
+    .post('/api/classes')
+    .set('Cookie', teacher.cookie)
+    .send({ name: 'Turma com convite temporário' });
+  assert.equal(created.status, 201);
+  const base = '/api/classes/' + created.body.id;
+  const invite = (account) => client.post(base + '/invite-code').set('Cookie', account.cookie);
+  assert.equal((await invite(otherTeacher)).status, 403);
+  assert.equal((await invite(student)).status, 403);
+
+  const shortInvite = await invite(teacher);
+  assert.equal(shortInvite.status, 200);
+  assert.match(shortInvite.body.code, /^\d{6}$/);
+  assert.equal((await invite(teacher)).body.code, shortInvite.body.code);
+  const join = (account, code) =>
+    client.post('/api/classes/join').set('Cookie', account.cookie).send({ code });
+
+  const pending = await join(student, shortInvite.body.code);
+  assert.equal(pending.status, 200);
+  assert.equal(pending.body.pending, true);
+  assert.equal((await client.get(base).set('Cookie', student.cookie)).status, 403);
+
+  await db
+    .collection('classInvites')
+    .doc(shortInvite.body.code)
+    .update({ expiresAt: new Date(0) });
+  assert.equal((await join(anotherStudent, shortInvite.body.code)).status, 404);
+  const details = await client.get(base).set('Cookie', teacher.cookie);
+  assert.deepEqual(
+    details.body.requests.map((row) => row.id),
+    [student.account.id],
+  );
+  const byLink = await join(anotherStudent, details.body.inviteCode);
+  assert.equal(byLink.status, 200);
+  assert.equal(byLink.body.pending, true);
+});
+
+test('sessão expira no limite e o cookie anterior ao logout perde acesso', async () => {
+  const sessionRef = (value) => {
+    const id = decodeURIComponent(value.split('=')[1]).slice(2).split('.')[0];
+    return db.collection('sessions').doc(id);
+  };
+  const expiring = await classroomAccount('aluno');
+  const expiredRef = sessionRef(expiring.cookie);
+  const stored = (await expiredRef.get()).data();
+  const state = JSON.parse(stored.data);
+  assert.ok(state.authenticatedUntil > Date.now());
+  // Keep the store TTL valid so the middleware must reject the session itself.
+  await expiredRef.update({
+    data: JSON.stringify({ ...state, authenticatedUntil: Date.now() }),
+  });
+  const expired = await client.get('/api/dashboard').set('Cookie', expiring.cookie);
+  assert.equal(expired.status, 401);
+  assert.match(expired.body.error, /Sessão expirada/);
+  assert.equal((await expiredRef.get()).exists, false);
+
+  const active = await classroomAccount('aluno');
+  const activeRef = sessionRef(active.cookie);
+  assert.equal((await client.get('/api/dashboard').set('Cookie', active.cookie)).status, 200);
+  const logout = await client.post('/api/logout').set('Cookie', active.cookie);
+  assert.equal(logout.status, 200);
+  assert.match(logout.headers['set-cookie'][0], /^mathstats\.sid=;/);
+  assert.equal((await activeRef.get()).exists, false);
+  assert.equal((await client.get('/api/dashboard').set('Cookie', active.cookie)).status, 401);
+});
+
+test('exclusão da conta limpa o pedido de turma e preserva outras solicitações', async () => {
+  const teacher = await classroomAccount('professor');
+  const student = await classroomAccount('aluno');
+  const anotherStudent = await classroomAccount('aluno');
+  const created = await client
+    .post('/api/classes')
+    .set('Cookie', teacher.cookie)
+    .send({ name: 'Turma com solicitações' });
+  assert.equal(created.status, 201);
+  const base = '/api/classes/' + created.body.id;
+  const { body: turma } = await client.get(base).set('Cookie', teacher.cookie);
+  for (const applicant of [student, anotherStudent]) {
+    const join = await client
+      .post('/api/classes/join')
+      .set('Cookie', applicant.cookie)
+      .send({ code: turma.inviteCode });
+    assert.equal(join.status, 200);
+    assert.equal(join.body.pending, true);
+  }
+
+  await UserModel.deleteUser(student.account.id);
+  const teacherView = await client.get(base).set('Cookie', teacher.cookie);
+  assert.equal(teacherView.status, 200);
+  assert.deepEqual(
+    teacherView.body.requests.map(({ id }) => id),
+    [anotherStudent.account.id],
+  );
+  const doc = await db.collection('classes').doc(created.body.id).get();
+  assert.deepEqual(doc.data().pendingStudentIds, [anotherStudent.account.id]);
+  assert.deepEqual(doc.data().studentIds, []);
+  assert.equal((await client.get('/api/classes').set('Cookie', student.cookie)).status, 401);
+});
+
+test(
+  'carga local do painel e da lista de turmas',
+  { skip: process.env.MATHSTATS_LOAD !== '1' },
+  async () => {
+    const { measureStage } = require('./load');
+    const levels = [1, 10, 30, 60];
+    const accounts = [];
+    while (accounts.length < levels.at(-1)) {
+      const batchSize = Math.min(5, levels.at(-1) - accounts.length);
+      accounts.push(
+        ...(await Promise.all(Array.from({ length: batchSize }, () => classroomAccount('aluno')))),
+      );
+    }
+
+    const teacher = await classroomAccount('professor');
+    const created = await client
+      .post('/api/classes')
+      .set('Cookie', teacher.cookie)
+      .send({ name: 'Turma de carga' });
+    assert.equal(created.status, 201);
+    await db
+      .collection('classes')
+      .doc(created.body.id)
+      .update({ studentIds: accounts.map(({ account }) => account.id) });
+
+    const origin = 'http://127.0.0.1:' + server.address().port;
+    const warmup = await measureStage(origin, accounts.slice(0, 1), 2000);
+    assert.equal(warmup.errorPercent, 0, JSON.stringify(warmup));
+    for (const users of levels) {
+      const stats = await measureStage(origin, accounts.slice(0, users), 12000);
+      console.log('LOAD_RESULT ' + JSON.stringify(stats));
+    }
+  },
+);

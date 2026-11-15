@@ -19,7 +19,9 @@ async function main() {
         'demo-mathstats-integration',
         '--config',
         'tests/integration/firebase.json',
-        'node --test --test-force-exit --test-concurrency=1 tests/integration/http.test.js',
+        process.argv.includes('--load')
+          ? 'node --test --test-force-exit --test-concurrency=1 --test-name-pattern=carga tests/integration/http.test.js'
+          : 'node --test --test-force-exit --test-concurrency=1 tests/integration/http.test.js',
       ],
       {
         stdio: 'inherit',
@@ -29,6 +31,7 @@ async function main() {
           MONGODB_URI: mongo.getUri(),
           MONGODB_DB: 'mathstats_integration',
           NODE_ENV: 'test',
+          MATHSTATS_LOAD: process.argv.includes('--load') ? '1' : '0',
           SESSION_SECRET: 'integration-only-session-secret',
           ENCRYPTION_KEY: '0'.repeat(64),
           FIREBASE_SERVICE_ACCOUNT_BASE64: '',

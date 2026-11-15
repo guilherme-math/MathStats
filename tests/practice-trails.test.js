@@ -45,3 +45,61 @@ test('todas as questões com alternativas incluem o gabarito uma vez, com dados 
     for (let i = 1; i <= 10; i++) check(await buildSportsPractice(trail, i));
   }
 });
+
+const topicGames = [
+  [3, 1],
+  [0, 2],
+  [2, 2],
+  [4, 0],
+  [1, 3],
+  [99, 0],
+].map(([gols, golsAdversario], index) => ({
+  adversario: 'Clube ' + index,
+  gols,
+  golsAdversario,
+}));
+
+test('trilhas por assunto calculam as respostas a partir dos cinco jogos exibidos', async (t) => {
+  t.mock.method(football, 'getRecentTeamMatches', async () => topicGames);
+  const cases = [
+    ['soma', 5, 18],
+    ['soma', 6, 2],
+    ['multiplicacao', 5, 6],
+    ['multiplicacao', 6, 1.4],
+    ['medias', 5, 2],
+    ['fracoes', 5, '4/5'],
+  ];
+  for (const [trail, position, answer] of cases) {
+    const question = await buildSportsPractice(trail, position);
+    assert.equal(question.respostaCorreta, answer, `${trail} ${position}`);
+    assert.equal(question.contexto, 'Dados reais da API-Football');
+    assert.deepEqual(
+      question.tabela.rows.map(([, opponent]) => opponent),
+      topicGames.slice(0, 5).map((game) => game.adversario),
+    );
+    if (trail === 'fracoes') {
+      assert.equal(question.tipo, 'multiple-choice');
+      assert.equal(question.options.filter((option) => option === answer).length, 1);
+    } else {
+      assert.equal(question.tipo, 'numeric');
+    }
+  }
+});
+
+test('trilha por assunto sinaliza indisponibilidade quando faltam partidas', async (t) => {
+  t.mock.method(football, 'getRecentTeamMatches', async () => topicGames.slice(0, 4));
+  await assert.rejects(buildSportsPractice('soma', 1), {
+    message: 'Partidas insuficientes para montar a questão.',
+    statusCode: 503,
+  });
+});
+
+test('trilha de dificuldade usa exercício simulado se a consulta de jogos falhar', async (t) => {
+  t.mock.method(football, 'getRecentTeamMatches', async () => {
+    throw new Error('Indisponibilidade simulada');
+  });
+  const question = await buildSportsPractice('media', 1);
+  assert.ok(question.pergunta);
+  assert.equal(question.tabela, undefined);
+  assert.notEqual(question.contexto, 'Dados reais da API-Football');
+});

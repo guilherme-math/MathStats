@@ -84,3 +84,23 @@ test('sessão no Firestore suporta gravação, leitura, renovação e exclusão'
   await callStore(store, 'destroy', 'session-1');
   assert.equal(await callStore(store, 'get', 'session-1'), null);
 });
+
+test('sessão fica disponível até o instante de expiração e é removida no limite', async (t) => {
+  const { FirestoreSessionStore } = require('../dist/stores/firestoreSessionStore');
+  const store = new FirestoreSessionStore();
+  const collection = createCollection();
+  store.sessions = collection;
+  const expires = Date.now() + 60_000;
+  let now = expires - 1;
+  t.mock.method(Date, 'now', () => now);
+
+  await callStore(store, 'set', 'boundary', {
+    cookie: { expires: new Date(expires + 60_000) },
+    authenticatedUntil: expires,
+    userId: 'student-a',
+  });
+  assert.equal((await callStore(store, 'get', 'boundary')).userId, 'student-a');
+  now = expires;
+  assert.equal(await callStore(store, 'get', 'boundary'), null);
+  assert.equal(collection.documents.has('boundary'), false);
+});
