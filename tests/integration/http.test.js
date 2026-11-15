@@ -1056,11 +1056,11 @@ test('exclusão da conta limpa o pedido de turma e preserva outras solicitaçõe
 });
 
 test(
-  'carga local do painel e da lista de turmas',
+  'carga local do painel, turmas e entregas simultâneas',
   { skip: process.env.MATHSTATS_LOAD !== '1' },
   async () => {
-    const { measureStage } = require('./load');
-    const levels = [1, 10, 30, 60];
+    const { loadOptions, measureStage, measureSubmissions } = require('./load');
+    const { levels, durationMs } = loadOptions();
     const accounts = [];
     while (accounts.length < levels.at(-1)) {
       const batchSize = Math.min(5, levels.at(-1) - accounts.length);
@@ -1075,17 +1075,45 @@ test(
       .set('Cookie', teacher.cookie)
       .send({ name: 'Turma de carga' });
     assert.equal(created.status, 201);
-    await db
-      .collection('classes')
-      .doc(created.body.id)
-      .update({ studentIds: accounts.map(({ account }) => account.id) });
+    const classRef = db.collection('classes').doc(created.body.id);
+    const classPath = '/api/classes/' + created.body.id;
+    await classRef.update({ studentIds: accounts.map(({ account }) => account.id) });
 
     const origin = 'http://127.0.0.1:' + server.address().port;
-    const warmup = await measureStage(origin, accounts.slice(0, 1), 2000);
+    const warmup = await measureStage(origin, [teacher], 1000);
     assert.equal(warmup.errorPercent, 0, JSON.stringify(warmup));
     for (const users of levels) {
-      const stats = await measureStage(origin, accounts.slice(0, users), 12000);
+      const stats = await measureStage(origin, accounts.slice(0, users), durationMs);
       console.log('LOAD_RESULT ' + JSON.stringify(stats));
     }
+
+    const createdActivity = await client
+      .post(classPath + '/activities')
+      .set('Cookie', teacher.cookie)
+      .send({
+        title: 'Atividade de carga',
+        questions: [
+          { type: 'numeric', prompt: 'Quanto é 1 + 1?', explanation: 'Some 1 e 1.', answer: 2 },
+        ],
+      });
+    assert.equal(createdActivity.status, 201);
+    const activityPath = classPath + '/activities/' + createdActivity.body.id;
+    const publication = await client
+      .post(activityPath + '/publish')
+      .set('Cookie', teacher.cookie)
+      .send({});
+    assert.equal(publication.status, 200);
+
+    const burst = await measureSubmissions(origin, activityPath + '/submit', accounts);
+    const stored = await classRef
+      .collection('activities')
+      .doc(createdActivity.body.id)
+      .collection('submissions')
+      .get();
+    const expectedIds = new Set(accounts.map(({ account }) => account.id));
+    console.log('LOAD_RESULT ' + JSON.stringify({ ...burst, persisted: stored.size }));
+    assert.equal(stored.size, accounts.length);
+    assert.equal(burst.successful, accounts.length);
+    assert.ok(stored.docs.every((doc) => expectedIds.has(doc.id) && doc.data().correct === 1));
   },
 );

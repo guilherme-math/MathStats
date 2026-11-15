@@ -1,7 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { db } = require('../dist/config/firebase');
-const { exportClassData } = require('../dist/services/classPrivacy');
+const { FieldValue } = require('firebase-admin/firestore');
+const { deleteClassData, exportClassData } = require('../dist/services/classPrivacy');
 
 test('exportação de turmas inclui solicitação pendente e somente registros do titular', async (t) => {
   const userId = 'student-a';
@@ -79,4 +80,49 @@ test('exportação de turmas inclui solicitação pendente e somente registros d
   ]);
   assert.equal(reads.length, 6);
   assert.ok(reads.every(([, , target]) => target === userId));
+});
+
+test('exclusão de vínculo apaga início e entrega do aluno sem acessar registros de colegas', async (t) => {
+  const userId = 'student-a';
+  const actions = [];
+  const entries = {
+    starts: new Set([userId, 'student-b']),
+    submissions: new Set([userId, 'student-b']),
+  };
+  const activityRef = {
+    collection: (kind) => ({
+      doc: (id) => ({
+        delete: async () => {
+          actions.push(kind);
+          entries[kind].delete(id);
+        },
+      }),
+    }),
+  };
+  const classRef = {
+    update: async ({ studentIds }) => {
+      assert.ok(studentIds.isEqual(FieldValue.arrayRemove(userId)));
+      actions.push('membership');
+    },
+    collection: (name) => {
+      assert.equal(name, 'activities');
+      return { get: async () => ({ docs: [{ ref: activityRef }] }) };
+    },
+  };
+  t.mock.method(db, 'collection', (name) => {
+    assert.equal(name, 'classes');
+    return {
+      where: (field, operator, target) => {
+        assert.equal(target, userId);
+        assert.equal(operator, field === 'teacherId' ? '==' : 'array-contains');
+        return { get: async () => ({ docs: field === 'studentIds' ? [{ ref: classRef }] : [] }) };
+      },
+    };
+  });
+
+  await deleteClassData(userId);
+  assert.equal(actions[0], 'membership');
+  assert.deepEqual(actions.slice(1).sort(), ['starts', 'submissions']);
+  assert.deepEqual([...entries.starts], ['student-b']);
+  assert.deepEqual([...entries.submissions], ['student-b']);
 });

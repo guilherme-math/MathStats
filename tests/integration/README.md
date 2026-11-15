@@ -10,7 +10,7 @@ npm run test:integration
 
 O executor inicia MongoDB 7.0.14 descartável e Firestore Emulator no projeto
 `demo-mathstats-integration`, executa HTTP em porta aleatória e encerra os bancos ao terminar.
-A porta 8187 deve estar livre. Cada cenário cadastra uma conta única pela API, faz login
+O executor escolhe portas locais livres para os emuladores. Cada cenário cadastra uma conta única pela API, faz login
 com senha e confirma TOTP. Senhas, criptografia, controllers, serviços, UserModel,
 transações Firestore, sessão persistida, autorização e auditoria MongoDB são reais.
 
@@ -35,12 +35,37 @@ npm run test:rpm
 ```
 
 O cenário inicializa contas e sessões de alunos nos mesmos bancos descartáveis da integração.
-Cada aluno consulta o painel e a lista de turmas cerca de uma vez por segundo. Há etapas de
-12 segundos com 1, 10, 30 e 60 alunos simultâneos. Cada linha `LOAD_RESULT` registra a taxa
-de requisições por minuto, a latência p95 e os erros. O RPM é calculado a partir da duração
-observada da etapa.
+Por padrão, são três etapas de 180 segundos com 30, 60 e 120 alunos simultâneos. Cada aluno
+consulta o painel e a lista de turmas cerca de uma vez a cada cinco segundos. Na última fase,
+todos os alunos da maior etapa enviam a mesma atividade simultaneamente. O teste confere
+quantas respostas foram gravadas, quais alunos entregaram e se a correção foi consistente.
 
-Em uma execução local, 60 alunos geraram 1.440 respostas com sucesso, a uma taxa estimada
-de 7.195 RPM, p95 de 40 ms e 0% de erros. Esse resultado cobre as duas consultas no servidor
-e nos bancos locais. A capacidade em produção e o impacto de entregas simultâneas de
-atividades precisam de medições próprias.
+Cada linha `LOAD_RESULT` registra latência p95, erros e códigos HTTP. Nas consultas,
+o resultado inclui RPM total, RPM de sucesso e métricas por rota. Para a entrega em rajada,
+a saída mostra o tempo até a última resposta e o número de entregas persistidas.
+
+Para configurar outra escala no PowerShell:
+
+```powershell
+$env:MATHSTATS_RPM_LEVELS = '30,60,120'
+$env:MATHSTATS_RPM_SECONDS = '180'
+npm run test:rpm
+```
+
+Os níveis devem ser crescentes, entre 1 e 300 alunos. Cada etapa pode durar de 5 a 300 segundos.
+Como as mesmas contas participam de etapas sucessivas, etapas mais longas podem atingir
+o limite de requisições por aluno. O cenário mede o servidor e os bancos locais, com uma
+turma de teste e históricos de aluno vazios ou pequenos. A capacidade em produção precisa
+de medições próprias.
+
+### Resultado da execução local
+
+| Alunos simultâneos | Consultas em 180 s | RPM com sucesso | Latência p95 | Erros |
+| -----------------: | -----------------: | --------------: | -----------: | ----: |
+|                 30 |              2.160 |             720 |        67 ms |    0% |
+|                 60 |              4.320 |           1.440 |        69 ms |    0% |
+|                120 |              8.640 |           2.880 |        55 ms |    0% |
+
+Na atividade compartilhada, as 120 entregas foram aceitas e persistidas em uma janela
+de 728 ms, com latência p95 de 714 ms e nenhum erro. O teste conferiu uma entrega
+corrigida por aluno.

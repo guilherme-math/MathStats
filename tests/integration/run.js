@@ -2,12 +2,31 @@ const { spawn } = require('node:child_process');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const fs = require('node:fs');
 const path = require('node:path');
+const net = require('node:net');
+const { randomUUID } = require('node:crypto');
+
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const port = server.address().port;
+      server.close((error) => (error ? reject(error) : resolve(port)));
+    });
+  });
+}
 
 async function main() {
   const temp = path.resolve('tmp/integration-java');
   fs.mkdirSync(temp, { recursive: true });
   const mongo = await MongoMemoryServer.create({ binary: { version: '7.0.14' } });
+  const configPath = path.join(temp, 'firebase-' + randomUUID() + '.json');
   try {
+    const config = JSON.parse(fs.readFileSync('tests/integration/firebase.json', 'utf8'));
+    config.emulators.firestore.port = await freePort();
+    config.emulators.hub = { port: await freePort() };
+    config.emulators.logging = { port: await freePort() };
+    fs.writeFileSync(configPath, JSON.stringify(config));
     const child = spawn(
       process.execPath,
       [
@@ -18,7 +37,7 @@ async function main() {
         '--project',
         'demo-mathstats-integration',
         '--config',
-        'tests/integration/firebase.json',
+        configPath,
         process.argv.includes('--load')
           ? 'node --test --test-force-exit --test-concurrency=1 --test-name-pattern=carga tests/integration/http.test.js'
           : 'node --test --test-force-exit --test-concurrency=1 tests/integration/http.test.js',
@@ -46,6 +65,7 @@ async function main() {
       child.once('exit', (code) => resolve(code ?? 1));
     });
   } finally {
+    fs.rmSync(configPath, { force: true });
     await mongo.stop();
   }
 }
